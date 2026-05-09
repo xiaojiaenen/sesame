@@ -1,0 +1,21 @@
+services:
+  sesame-gateway:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/sesame.db
+      - ENCRYPTION_KEY=${SESAME_ENCRYPTION_KEY}
+      - ENTERPRISE_AI_URL=${ENTERPRISE_AI_URL:-https://agents.gree.com}
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-sesame2026}
+    volumes:
+      - sesame_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  sesame_data:
