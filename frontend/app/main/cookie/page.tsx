@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { fadeInUp } from "@/lib/animations";
 import { motion } from "motion/react";
 import { PageHeader } from "@/components/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -97,17 +98,14 @@ export default function CookiePage() {
       />
 
       {/* Status Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <Card className="border-0 shadow-sm">
+      <motion.div {...fadeInUp}>
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
                 isActive
-                  ? "bg-emerald-100 text-emerald-600"
-                  : "bg-slate-100 text-slate-500"
+                  ? "bg-success/10 text-success"
+                  : "bg-muted text-muted-foreground"
               }`}>
                 <Cookie className="w-6 h-6" />
               </div>
@@ -127,22 +125,18 @@ export default function CookiePage() {
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
                   {isActive ? (
-                    <motion.div 
-                      initial={{ scale: 0 }} 
-                      animate={{ scale: 1 }}
-                      className="flex items-center gap-2"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    <motion.div {...fadeInUp} className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
+                        <CheckCircle2 className="w-5 h-5 text-success" />
                       </div>
-                      <Badge className="text-sm bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                      <Badge className="text-sm bg-success/10 text-success hover:bg-success/10">
                         正常运行
                       </Badge>
                     </motion.div>
                   ) : (
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                        <XCircle className="w-5 h-5 text-slate-400" />
+                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                        <XCircle className="w-5 h-5 text-muted-foreground" />
                       </div>
                       <Badge variant="secondary" className="text-sm">
                         {status.status === "expired" ? "已过期" : "未配置"}
@@ -152,8 +146,8 @@ export default function CookiePage() {
                 </div>
                 
                 {status.expire_at && (
-                  <div className="flex items-center gap-2 text-sm text-slate-600 bg-white/60 p-3 rounded-lg">
-                    <Clock className="w-4 h-4 text-slate-400" />
+                  <div className="flex items-center gap-2 text-sm text-foreground bg-background/60 p-3 rounded-lg">
+                    <Clock className="w-4 h-4 text-muted-foreground" />
                     <span>过期时间：</span>
                     <span className="font-medium">{new Date(status.expire_at).toLocaleString()}</span>
                   </div>
@@ -161,18 +155,18 @@ export default function CookiePage() {
                 
                 {status.cookie_preview && (
                   <div>
-                    <div className="text-sm text-slate-500 mb-2 flex items-center gap-2">
+                    <div className="text-sm text-muted-foreground mb-2 flex items-center gap-2">
                       <Lock className="w-4 h-4" />
                       Cookie 预览
                     </div>
                     <div
-                      className="p-3 bg-white/60 rounded-xl border border-slate-200 font-mono text-xs break-all cursor-pointer hover:bg-white transition-colors flex items-center gap-2 group"
+                      className="p-3 bg-background/60 rounded-xl border border-border font-mono text-xs break-all cursor-pointer hover:bg-background transition-colors flex items-center gap-2 group"
                       onClick={handleCopy}
                       title="点击复制"
                     >
-                      <span className="flex-1 text-slate-600">{status.cookie_preview}</span>
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Copy className="w-4 h-4 text-slate-500" />
+                      <span className="flex-1 text-foreground">{status.cookie_preview}</span>
+                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Copy className="w-4 h-4 text-muted-foreground" />
                       </div>
                     </div>
                   </div>
@@ -183,7 +177,7 @@ export default function CookiePage() {
                     variant="outline"
                     size="sm"
                     onClick={fetchStatus}
-                    className="text-slate-600"
+                    className="text-muted-foreground"
                   >
                     <RefreshCw className="w-4 h-4 mr-2" />
                     刷新状态
@@ -192,7 +186,7 @@ export default function CookiePage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setIsDeleteDialogOpen(true)}
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200"
+                    className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 border-destructive/30"
                   >
                     <Trash2 className="w-4 h-4 mr-2" />
                     删除 Cookie
@@ -200,9 +194,9 @@ export default function CookiePage() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-xl border border-amber-200">
-                <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
-                <span className="text-sm text-amber-700">尚未配置 Cookie，请在下方提交</span>
+              <div className="flex items-center gap-3 p-4 bg-warning/5 rounded-xl border border-warning/20">
+                <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0" />
+                <span className="text-sm text-warning">尚未配置 Cookie，请在下方提交</span>
               </div>
             )}
           </CardContent>
@@ -210,12 +204,8 @@ export default function CookiePage() {
       </motion.div>
 
       {/* Submit Card */}
-      <motion.div 
-        initial={{ opacity: 0, y: 10 }} 
-        animate={{ opacity: 1, y: 0 }} 
-        transition={{ delay: 0.1 }}
-      >
-        <Card className="border-0 shadow-sm">
+      <motion.div {...fadeInUp} transition={{ delay: 0.1 }}>
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardHeader>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -230,7 +220,7 @@ export default function CookiePage() {
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="cookie" className="text-slate-600 flex items-center gap-2">
+                <Label htmlFor="cookie" className="text-foreground flex items-center gap-2">
                   <Cookie className="w-4 h-4" />
                   Cookie 内容
                 </Label>
@@ -240,11 +230,11 @@ export default function CookiePage() {
                   rows={4}
                   value={cookieVal}
                   onChange={(e) => setCookieVal(e.target.value)}
-                  className="bg-slate-50/50 border-slate-200 focus:bg-white font-mono text-sm resize-none"
+                  className="bg-muted/50 border-border focus:bg-background font-mono text-sm resize-none"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="expire" className="text-slate-600 flex items-center gap-2">
+                <Label htmlFor="expire" className="text-foreground flex items-center gap-2">
                   <Clock className="w-4 h-4" />
                   有效天数
                 </Label>
@@ -255,7 +245,7 @@ export default function CookiePage() {
                   max="365"
                   value={expireDays}
                   onChange={(e) => setExpireDays(e.target.value)}
-                  className="w-32 bg-slate-50/50 border-slate-200 focus:bg-white"
+                  className="w-32 bg-muted/50 border-border focus:bg-background"
                 />
               </div>
               
@@ -304,8 +294,8 @@ export default function CookiePage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center">
-                <Trash2 className="w-4 h-4 text-red-500" />
+              <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+                <Trash2 className="w-4 h-4 text-destructive" />
               </div>
               确认删除 Cookie？
             </DialogTitle>
@@ -318,7 +308,7 @@ export default function CookiePage() {
             <Button 
               variant="destructive" 
               onClick={handleDelete}
-              className="bg-red-500 hover:bg-red-600"
+              className="bg-destructive hover:bg-destructive/90"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               确认删除

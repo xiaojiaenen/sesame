@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { fadeInUp } from "@/lib/animations";
 import { motion } from "motion/react";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
@@ -167,7 +168,7 @@ export default function ChannelsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">正常</Badge>;
+        return <Badge className="bg-success/10 text-success hover:bg-success/10">正常</Badge>;
       case "error":
         return <Badge variant="destructive">异常</Badge>;
       default:
@@ -178,7 +179,7 @@ export default function ChannelsPage() {
   const getCookieStatusBadge = (status?: string) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">已配置</Badge>;
+        return <Badge className="bg-success/10 text-success hover:bg-success/10">已配置</Badge>;
       case "expired":
         return <Badge variant="destructive">已过期</Badge>;
       default:
@@ -200,11 +201,8 @@ export default function ChannelsPage() {
       />
 
       {/* 负载均衡和渠道选择 */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <Card className="border-0 shadow-sm">
+      <motion.div {...fadeInUp}>
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardContent className="p-4 flex items-center gap-6">
             <div className="flex items-center gap-3">
               <Switch
@@ -240,7 +238,7 @@ export default function ChannelsPage() {
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="border-0 shadow-sm">
+            <Card key={i} className="ring-1 ring-border/40 shadow-xs">
               <CardContent className="p-6 space-y-3">
                 <div className="h-6 w-32 skeleton-shimmer rounded-lg" />
                 <div className="h-4 w-48 skeleton-shimmer rounded-lg" />
@@ -250,7 +248,7 @@ export default function ChannelsPage() {
           ))}
         </div>
       ) : channels.length === 0 ? (
-        <Card className="border-0 shadow-sm">
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardContent className="p-0">
             <EmptyState
               icon={<Server className="w-8 h-8 text-muted-foreground" />}
@@ -266,16 +264,15 @@ export default function ChannelsPage() {
             return (
               <motion.div
                 key={ch.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
+                {...fadeInUp}
                 transition={{ delay: i * 0.05 }}
               >
-                <Card className="border-0 shadow-sm hover:shadow-md transition-shadow h-full">
+                <Card className="ring-1 ring-border/40 shadow-xs hover:shadow-md transition-shadow h-full">
                   <CardHeader className="pb-3">
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
                         ch.auth_type === "cookie"
-                          ? "bg-amber-100 text-amber-600"
+                          ? "bg-warning/10 text-warning"
                           : "bg-primary/10 text-primary"
                       }`}>
                         {ch.auth_type === "cookie" ? (
@@ -301,10 +298,10 @@ export default function ChannelsPage() {
                     {models.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
                         {models.slice(0, 3).map(m => (
-                          <Badge key={m} variant="secondary" className="text-[10px]">{m}</Badge>
+                          <Badge key={m} variant="secondary" className="text-[11px]">{m}</Badge>
                         ))}
                         {models.length > 3 && (
-                          <Badge variant="secondary" className="text-[10px]">+{models.length - 3}</Badge>
+                          <Badge variant="secondary" className="text-[11px]">+{models.length - 3}</Badge>
                         )}
                       </div>
                     ) : (
@@ -346,8 +343,8 @@ export default function ChannelsPage() {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                <Cookie className="w-4 h-4 text-amber-600" />
+              <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
+                <Cookie className="w-4 h-4 text-warning" />
               </div>
               配置 Cookie - {dialogChannel?.name}
             </DialogTitle>
@@ -359,12 +356,12 @@ export default function ChannelsPage() {
           <div className="space-y-4">
             {/* 当前状态 */}
             {cookieDetail && cookieDetail.status !== "none" && (
-              <div className="p-3 bg-slate-50 rounded-lg space-y-2">
+              <div className="p-3 bg-muted rounded-lg space-y-2">
                 <div className="flex items-center gap-2">
                   {cookieDetail.status === "active" ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <CheckCircle2 className="w-4 h-4 text-success" />
                   ) : (
-                    <XCircle className="w-4 h-4 text-red-500" />
+                    <XCircle className="w-4 h-4 text-destructive" />
                   )}
                   <span className="text-sm font-medium">
                     {cookieDetail.status === "active" ? "当前 Cookie 有效" : "当前 Cookie 已过期"}
@@ -427,7 +424,7 @@ export default function ChannelsPage() {
               <Button
                 variant="outline"
                 onClick={() => setDeleteDialogOpen(true)}
-                className="text-red-500 hover:text-red-700 hover:bg-red-50 border-red-200 mr-auto"
+                className="text-destructive hover:text-destructive/80 hover:bg-destructive/10 border-destructive/30 mr-auto"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
                 删除
