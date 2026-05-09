@@ -7,12 +7,41 @@ import { apiFetch } from "@/lib/api";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { motion } from "motion/react";
 import {
-  Key, Cookie, Users, Route, Activity, ArrowRight,
-  AlertTriangle, CheckCircle2, XCircle, Clock, Zap, TrendingUp,
-  Server, Database
+  Key, Users, Route, Activity, ArrowRight,
+  AlertTriangle, CheckCircle2, XCircle, Clock,
+  Server, Database, BookOpen, BarChart3, FileText
 } from "lucide-react";
+
+function StatCard({ icon: Icon, label, value, loading, color = "primary", href }: {
+  icon: React.ElementType; label: string; value: React.ReactNode; loading?: boolean;
+  color?: string; href?: string;
+}) {
+  const content = (
+    <Card className="border-border/50 hover-glow transition-all duration-200 h-full">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
+            {loading ? (
+              <div className="h-8 w-16 skeleton-shimmer rounded-md" />
+            ) : (
+              <p className="text-2xl font-bold text-foreground tracking-tight">{value}</p>
+            )}
+          </div>
+          <div className={`w-9 h-9 rounded-lg bg-${color}/10 flex items-center justify-center shrink-0`}>
+            <Icon className={`w-4.5 h-4.5 text-${color}`} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  if (href) {
+    return <Link href={href} className="block">{content}</Link>;
+  }
+  return content;
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -56,333 +85,161 @@ export default function DashboardPage() {
   const cookieOk = cookieStatus?.status === "active";
 
   return (
-    <div className="space-y-8">
-      {/* Welcome Section */}
-      <motion.div 
-        initial={{ opacity: 0, y: 10 }} 
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
-      >
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">
-            欢迎回来，<span className="text-primary">{user?.user_id}</span>
-          </h2>
-          <p className="text-muted-foreground mt-1 flex items-center gap-2">
-            <Clock className="w-4 h-4" />
-            {new Date().toLocaleDateString('zh-CN', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-              weekday: 'long'
-            })}
-          </p>
-        </div>
-        {user?.role === "admin" && (
-          <Badge variant="outline" className="gap-1.5 px-3 py-1.5">
-            管理员
-          </Badge>
-        )}
-      </motion.div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div>
+        <h2 className="text-xl font-bold text-foreground tracking-tight">
+          欢迎回来，{user?.user_id}
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          {new Date().toLocaleDateString('zh-CN', {
+            year: 'numeric', month: 'long', day: 'numeric', weekday: 'long'
+          })}
+        </p>
+      </div>
 
       {/* Alert Banner */}
       {!loading && !cookieOk && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-center gap-4"
-        >
-          <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
-            <AlertTriangle className="w-6 h-6 text-amber-600" />
+        <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5 text-amber-600" />
           </div>
-          <div className="flex-1">
-            <div className="font-semibold text-amber-800">Cookie 未配置或已失效</div>
-            <div className="text-sm text-amber-600 mt-0.5">请先提交企业 AI Cookie 才能使用代理服务</div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-semibold text-amber-800">Cookie 未配置或已失效</div>
+            <div className="text-xs text-amber-600 mt-0.5">请先提交企业 AI Cookie 才能使用代理服务</div>
           </div>
-          <Link href="/main/cookie">
-            <Button className="bg-amber-500 hover:bg-amber-600">
-              去配置 <ArrowRight className="w-4 h-4 ml-1" />
+          <Link href="/main/channels">
+            <Button size="sm" className="bg-amber-500 hover:bg-amber-600 shrink-0">
+              去配置 <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </Button>
           </Link>
-        </motion.div>
+        </div>
       )}
 
-      {/* Quick Stats */}
-      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {/* User Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card className="border-0 shadow-sm hover-lift">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <img src="/logo.svg" alt="Sesame" className="w-14 h-14" />
-                <div>
-                  <div className="text-sm text-muted-foreground">当前用户</div>
-                  <div className="text-xl font-bold text-foreground mt-0.5">{user?.user_id}</div>
-                  <Badge variant="secondary" className="mt-2 text-[10px]">
-                    {user?.role === "admin" ? "管理员" : "普通用户"}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+      {/* Bento Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* User Card — spans 2 cols */}
+        <Card className="border-border/50 md:col-span-2">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <span className="text-lg font-bold text-primary">
+                {user?.user_id?.[0]?.toUpperCase() || "U"}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-muted-foreground">当前用户</div>
+              <div className="text-lg font-semibold text-foreground truncate">{user?.user_id}</div>
+            </div>
+            <Badge variant="secondary" className="shrink-0">
+              {user?.role === "admin" ? "管理员" : "普通用户"}
+            </Badge>
+          </CardContent>
+        </Card>
 
-        {/* Cookie Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <Card className="border-0 shadow-sm hover-lift">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-                  cookieOk
-                    ? "bg-emerald-100 text-emerald-600"
-                    : "bg-slate-100 text-slate-500"
-                }`}>
-                  <Cookie className="w-7 h-7" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm text-muted-foreground">Cookie 状态</div>
-                  <div className="flex items-center gap-2 mt-1">
-                    {loading ? (
-                      <div className="h-7 w-24 skeleton-shimmer rounded-lg" />
-                    ) : cookieOk ? (
-                      <motion.div
-                        initial={{ scale: 0.8 }}
-                        animate={{ scale: 1 }}
-                        className="flex items-center gap-2"
-                      >
-                        <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center">
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                        </div>
-                        <span className="font-semibold text-emerald-700">正常运行</span>
-                      </motion.div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center">
-                          <XCircle className="w-4 h-4 text-slate-400" />
-                        </div>
-                        <span className="font-semibold text-slate-500">未配置</span>
-                      </div>
-                    )}
-                  </div>
-                  {cookieStatus?.expire_at && (
-                    <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      过期: {new Date(cookieStatus.expire_at).toLocaleDateString()}
-                    </div>
-                  )}
-                </div>
-                <Link href="/main/cookie">
-                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {/* Status Cards */}
+        <StatCard
+          icon={cookieOk ? CheckCircle2 : XCircle}
+          label="Cookie 状态"
+          value={loading ? "..." : cookieOk ? "正常" : "未配置"}
+          loading={loading}
+          color={cookieOk ? "success" : "muted-foreground"}
+          href="/main/channels"
+        />
 
-        {/* API Key Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          <Card className="border-0 shadow-sm hover-lift">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-                  <Key className="w-7 h-7 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm text-muted-foreground">API Key</div>
-                  {loading ? (
-                    <div className="h-7 w-20 skeleton-shimmer rounded-lg mt-1" />
-                  ) : (
-                    <div className="text-xl font-bold text-foreground mt-0.5">
-                      {apiKeyCount ?? 0} <span className="text-sm font-normal text-muted-foreground">个</span>
-                    </div>
-                  )}
-                  <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                    <Zap className="w-3 h-3" />
-                    管理您的 API 密钥
-                  </div>
-                </div>
-                <Link href="/main/api-keys">
-                  <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+        <StatCard
+          icon={Key}
+          label="API Keys"
+          value={apiKeyCount ?? 0}
+          loading={loading}
+          href="/main/api-keys"
+        />
       </div>
 
       {/* Admin Stats */}
-      {user?.role === "admin" && adminStats && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <div className="flex items-center gap-2 mb-5">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4 text-primary" />
-            </div>
-            <h3 className="font-semibold text-foreground">系统概览</h3>
+      {user?.role === "admin" && (
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-foreground">系统概览</h3>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              icon={Users}
+              label="用户数"
+              value={adminStats?.userCount ?? 0}
+              loading={!adminStats}
+            />
+            <StatCard
+              icon={Route}
+              label="代理路由"
+              value={adminStats?.routeCount ?? 0}
+              loading={!adminStats}
+            />
+            <StatCard
+              icon={Database}
+              label="数据库"
+              value={adminStats?.health?.database === "ok" ? "正常" : "异常"}
+              loading={!adminStats}
+              color={adminStats?.health?.database === "ok" ? "success" : "destructive"}
+            />
+            <StatCard
+              icon={Server}
+              label="服务状态"
+              value={adminStats?.health?.status === "healthy" ? "健康" : "异常"}
+              loading={!adminStats}
+              color={adminStats?.health?.status === "healthy" ? "success" : "destructive"}
+            />
           </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card className="border-0 shadow-sm hover-lift">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Users className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">用户数</div>
-                    <div className="text-2xl font-bold text-foreground">{adminStats.userCount ?? 0}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm hover-lift">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Route className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">代理路由</div>
-                    <div className="text-2xl font-bold text-foreground">{adminStats.routeCount ?? 0}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm hover-lift">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Database className="w-5 h-5 text-primary" />
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">数据库</div>
-                    <Badge
-                      variant={adminStats.health?.database === "ok" ? "default" : "destructive"}
-                      className="mt-1"
-                    >
-                      {adminStats.health?.database === "ok" ? "正常" : "异常"}
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-0 shadow-sm hover-lift">
-              <CardContent className="p-5">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    adminStats.health?.status === "healthy"
-                      ? "bg-emerald-100"
-                      : "bg-red-100"
-                  }`}>
-                    <Server className={`w-5 h-5 ${
-                      adminStats.health?.status === "healthy"
-                        ? "text-emerald-600"
-                        : "text-red-600"
-                    }`} />
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">服务状态</div>
-                    <div className="flex items-center gap-2 mt-1">
-                      {loading ? (
-                        <div className="h-6 w-16 skeleton-shimmer rounded" />
-                      ) : (
-                        <>
-                          <div className={`w-2 h-2 rounded-full ${
-                            adminStats.health?.status === "healthy"
-                              ? "bg-emerald-500 animate-pulse"
-                              : "bg-red-500"
-                          }`} />
-                          <span className="text-sm font-medium">
-                            {adminStats.health?.status === "healthy" ? "健康" : "异常"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">v{adminStats.health?.version || "?"}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </motion.div>
+        </div>
       )}
 
       {/* Quick Actions */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <div className="flex items-center gap-2 mb-5">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Zap className="w-4 h-4 text-primary" />
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground">快速操作</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { icon: Server, label: "渠道管理", desc: "查看和配置后端渠道", href: "/main/channels" },
+            { icon: Key, label: "API Key", desc: "创建和管理访问密钥", href: "/main/api-keys" },
+            { icon: BookOpen, label: "使用说明", desc: "查看配置指南", href: "/main/guide" },
+          ].map((item) => (
+            <Link key={item.href} href={item.href}>
+              <Card className="border-border/50 hover-glow transition-all duration-200 cursor-pointer group h-full">
+                <CardContent className="p-4 flex items-center gap-3.5">
+                  <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
+                    <item.icon className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-foreground">{item.label}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{item.desc}</div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground/50 ml-auto group-hover:text-foreground/50 transition-colors" />
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Admin Quick Links */}
+      {user?.role === "admin" && (
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-foreground">管理后台</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { icon: Users, label: "用户管理", href: "/main/admin/users" },
+              { icon: BarChart3, label: "用量统计", href: "/main/admin/usage" },
+              { icon: Activity, label: "实时监控", href: "/main/admin/monitor" },
+              { icon: FileText, label: "请求日志", href: "/main/admin/logs" },
+            ].map((item) => (
+              <Link key={item.href} href={item.href}>
+                <Card className="border-border/50 hover:bg-muted/50 transition-colors cursor-pointer">
+                  <CardContent className="p-3.5 flex items-center gap-2.5">
+                    <item.icon className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm text-foreground">{item.label}</span>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
-          <h3 className="font-semibold text-foreground">快速操作</h3>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <Link href="/main/cookie">
-            <Card className="border-0 shadow-sm hover-lift cursor-pointer group">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Cookie className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <div className="font-medium text-foreground">管理 Cookie</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">提交或更新认证凭证</div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/main/api-keys">
-            <Card className="border-0 shadow-sm hover-lift cursor-pointer group">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Key className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <div className="font-medium text-foreground">API Key</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">创建和管理密钥</div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href="/main/guide">
-            <Card className="border-0 shadow-sm hover-lift cursor-pointer group">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Activity className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <div className="font-medium text-foreground">使用说明</div>
-                  <div className="text-xs text-muted-foreground mt-0.5">查看配置指南</div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-      </motion.div>
+      )}
     </div>
   );
 }

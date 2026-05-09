@@ -1,23 +1,36 @@
 export default function MainLoading() {
   return (
-    <div className="space-y-6 animate-pulse">
+    <div className="space-y-6">
+      {/* Header skeleton */}
       <div className="space-y-2">
-        <div className="h-7 w-40 bg-slate-200 rounded-lg" />
-        <div className="h-4 w-64 bg-slate-100 rounded-lg" />
+        <div className="h-6 w-36 bg-muted rounded-md animate-pulse" />
+        <div className="h-4 w-52 bg-muted rounded-md animate-pulse" />
       </div>
-      <div className="flex gap-4">
-        <div className="h-10 w-32 bg-slate-200 rounded-lg" />
-        <div className="h-10 w-32 bg-slate-200 rounded-lg" />
-        <div className="h-10 w-32 bg-slate-200 rounded-lg" />
+
+      {/* Stat cards skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="rounded-xl border border-border/50 p-5 space-y-3">
+            <div className="flex items-start justify-between">
+              <div className="space-y-2">
+                <div className="h-3 w-16 bg-muted rounded animate-pulse" />
+                <div className="h-8 w-12 bg-muted rounded animate-pulse" />
+              </div>
+              <div className="w-9 h-9 bg-muted rounded-lg animate-pulse" />
+            </div>
+          </div>
+        ))}
       </div>
-      <div className="bg-white rounded-xl border border-border overflow-hidden">
-        <div className="h-12 bg-slate-50 border-b border-border" />
+
+      {/* Table skeleton */}
+      <div className="rounded-xl border border-border/50 overflow-hidden">
+        <div className="h-11 bg-muted/50 border-b border-border/50" />
         {Array.from({ length: 5 }).map((_, i) => (
-          <div key={i} className="h-14 border-b border-border flex items-center px-6 gap-4">
-            <div className="h-4 w-24 bg-slate-200 rounded" />
-            <div className="h-4 w-32 bg-slate-100 rounded" />
-            <div className="h-4 w-20 bg-slate-200 rounded" />
-            <div className="h-4 w-16 bg-slate-100 rounded" />
+          <div key={i} className="h-14 border-b border-border/30 flex items-center px-5 gap-4">
+            <div className="h-4 w-24 bg-muted rounded animate-pulse" />
+            <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+            <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+            <div className="h-4 w-16 bg-muted rounded animate-pulse ml-auto" />
           </div>
         ))}
       </div>

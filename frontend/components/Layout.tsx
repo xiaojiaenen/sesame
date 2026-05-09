@@ -6,17 +6,15 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Key, Users, Network,
-  Activity, LogOut, ChevronRight, FileText, BarChart3, Server
+  Activity, LogOut, FileText, BarChart3, Server, BookOpen
 } from "lucide-react";
 import { Button } from "./ui/button";
-import { Separator } from "./ui/separator";
-import { motion } from "motion/react";
 
 const NAV_ITEMS = [
   { name: "仪表盘", href: "/main/dashboard", icon: LayoutDashboard },
   { name: "渠道管理", href: "/main/channels", icon: Server },
   { name: "API Key 管理", href: "/main/api-keys", icon: Key },
-  { name: "使用说明", href: "/main/guide", icon: Activity },
+  { name: "使用说明", href: "/main/guide", icon: BookOpen },
 ];
 
 const ADMIN_ITEMS = [
@@ -41,173 +39,144 @@ const PAGE_TITLES: Record<string, string> = {
   monitor: "实时监控",
 };
 
+function NavItem({ item, active }: { item: typeof NAV_ITEMS[0]; active: boolean }) {
+  return (
+    <li>
+      <Link
+        href={item.href}
+        className={cn(
+          "group flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 relative",
+          active
+            ? "text-primary font-medium bg-primary/[0.06]"
+            : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+        )}
+      >
+        {active && (
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary" />
+        )}
+        <item.icon className={cn(
+          "w-4 h-4 shrink-0 transition-colors",
+          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+        )} />
+        <span>{item.name}</span>
+      </Link>
+    </li>
+  );
+}
+
+function SidebarSkeleton() {
+  return (
+    <div className="min-h-screen flex bg-background">
+      <aside className="w-60 bg-card border-r border-border flex flex-col">
+        <div className="h-14 flex items-center gap-2.5 px-4 border-b border-border">
+          <div className="w-7 h-7 rounded-lg bg-muted animate-pulse" />
+          <div className="space-y-1">
+            <div className="h-3.5 w-16 bg-muted rounded animate-pulse" />
+            <div className="h-2.5 w-24 bg-muted rounded animate-pulse" />
+          </div>
+        </div>
+        <div className="flex-1 p-3 space-y-1">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-9 bg-muted rounded-lg animate-pulse" />
+          ))}
+        </div>
+      </aside>
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+        <header className="h-14 bg-card border-b border-border" />
+        <div className="flex-1 p-6 space-y-4">
+          <div className="h-6 w-32 bg-muted rounded animate-pulse" />
+          <div className="h-4 w-48 bg-muted rounded animate-pulse" />
+          <div className="h-48 bg-muted rounded-xl animate-pulse" />
+        </div>
+      </main>
+    </div>
+  );
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, isLoading } = useAuth();
   const pathname = usePathname();
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex bg-background">
-        <aside className="w-64 bg-card border-r border-border flex flex-col shadow-sm">
-          <div className="h-16 flex items-center gap-3 px-5 border-b border-border">
-            <img src="/logo.svg" alt="Sesame" className="w-9 h-9" />
-            <div>
-              <div className="font-bold text-foreground text-sm">Sesame</div>
-              <div className="text-[10px] text-muted-foreground -mt-0.5">Gateway Console</div>
-            </div>
-          </div>
-          <div className="flex-1 p-3 space-y-2 animate-pulse">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-10 bg-slate-100 rounded-xl" />
-            ))}
-          </div>
-        </aside>
-        <main className="flex-1 flex flex-col h-screen overflow-hidden">
-          <header className="h-16 bg-card/80 border-b border-border" />
-          <div className="flex-1 p-8 animate-pulse space-y-6">
-            <div className="h-7 w-40 bg-slate-200 rounded-lg" />
-            <div className="h-4 w-64 bg-slate-100 rounded-lg" />
-            <div className="h-64 bg-slate-100 rounded-xl" />
-          </div>
-        </main>
-      </div>
-    );
+    return <SidebarSkeleton />;
   }
 
   const pageTitle = PAGE_TITLES[pathname.split("/").pop() || ""] || "Sesame";
 
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Sidebar */}
-      <aside className="w-64 bg-card border-r border-border flex flex-col shadow-sm">
+      {/* Sidebar — 240px, compact */}
+      <aside className="w-60 bg-card border-r border-border flex flex-col shrink-0">
         {/* Logo */}
-        <div className="h-16 flex items-center gap-3 px-5 border-b border-border">
-          <img src="/logo.svg" alt="Sesame" className="w-9 h-9" />
-          <div>
-            <div className="font-bold text-foreground text-sm">Sesame</div>
-            <div className="text-[10px] text-muted-foreground -mt-0.5">Gateway Console</div>
+        <div className="h-14 flex items-center gap-2.5 px-4 border-b border-border">
+          <img src="/logo.svg" alt="Sesame" className="w-7 h-7" />
+          <div className="leading-none">
+            <div className="font-bold text-sm text-foreground tracking-tight">Sesame</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">Gateway</div>
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-4 px-3">
-          <ul className="space-y-1">
-            {NAV_ITEMS.map((item) => {
-              const active = pathname.startsWith(item.href);
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 group relative",
-                      active
-                        ? "bg-primary text-primary-foreground"
-                        : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                    )}
-                  >
-                    <div className={cn(
-                      "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                      active
-                        ? "bg-white/20"
-                        : "bg-slate-100 group-hover:bg-slate-200"
-                    )}>
-                      <item.icon className="w-4 h-4 transition-transform group-hover:scale-110" />
-                    </div>
-                    <span className={active ? "font-medium" : ""}>{item.name}</span>
-                    {active && (
-                      <motion.div
-                        layoutId="nav-indicator"
-                        className="absolute right-2"
-                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                      >
-                        <ChevronRight className="w-4 h-4 text-white/80" />
-                      </motion.div>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
+        <nav className="flex-1 overflow-y-auto py-3 px-2.5">
+          <ul className="space-y-0.5">
+            {NAV_ITEMS.map((item) => (
+              <NavItem key={item.href} item={item} active={pathname.startsWith(item.href)} />
+            ))}
 
             {user?.role === "admin" && (
               <>
-                <Separator className="my-4" />
-                <div className="mb-2 px-3">
-                  <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">管理后台</span>
-                </div>
-                {ADMIN_ITEMS.map((item) => {
-                  const active = pathname.startsWith(item.href);
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 group",
-                          active
-                            ? "bg-primary text-primary-foreground"
-                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
-                        )}
-                      >
-                        <div className={cn(
-                          "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                          active
-                            ? "bg-white/20"
-                            : "bg-slate-100 group-hover:bg-slate-200"
-                        )}>
-                          <item.icon className="w-4 h-4 transition-transform group-hover:scale-110" />
-                        </div>
-                        <span className={active ? "font-medium" : ""}>{item.name}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
+                <li className="my-3 mx-1">
+                  <div className="h-px bg-border" />
+                </li>
+                <li className="mb-1.5 px-3">
+                  <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+                    管理后台
+                  </span>
+                </li>
+                {ADMIN_ITEMS.map((item) => (
+                  <NavItem key={item.href} item={item} active={pathname.startsWith(item.href)} />
+                ))}
               </>
             )}
           </ul>
         </nav>
 
-        {/* User Info */}
-        <div className="p-4 border-t border-border">
-          <div className="flex items-center gap-3 mb-3 px-1">
-            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-semibold text-sm">
+        {/* User */}
+        <div className="p-3 border-t border-border">
+          <div className="flex items-center gap-2.5 px-2 py-2">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
               {user?.user_id?.[0]?.toUpperCase() || "U"}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-foreground truncate">{user?.user_id}</div>
-              <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                {user?.role === "admin" && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-primary/10 text-primary">ADMIN</span>
-                )}
-                {user?.role === "admin" ? "管理员" : "普通用户"}
+              <div className="text-[13px] font-medium text-foreground truncate leading-tight">
+                {user?.user_id}
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                {user?.role === "admin" ? "管理员" : "用户"}
               </div>
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
+              onClick={logout}
+              title="退出登录"
+            >
+              <LogOut className="w-4 h-4" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full flex items-center gap-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors rounded-xl"
-            onClick={logout}
-          >
-            <LogOut className="w-4 h-4" />
-            退出登录
-          </Button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="h-16 bg-card/80 backdrop-blur-sm border-b border-border flex items-center px-8">
-          <motion.h1
-            key={pageTitle}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.12 }}
-            className="font-semibold text-foreground text-lg"
-          >
+      <main className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
+        <header className="h-14 bg-card border-b border-border flex items-center px-6 shrink-0">
+          <h1 className="font-semibold text-foreground text-base tracking-tight">
             {pageTitle}
-          </motion.h1>
+          </h1>
         </header>
         <div className="flex-1 overflow-y-auto">
-          <div className="p-8" key={pathname}>
+          <div className="p-6 max-w-[1400px]" key={pathname}>
             {children}
           </div>
         </div>
