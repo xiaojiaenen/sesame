@@ -45,14 +45,14 @@ function NavItem({ item, active }: { item: typeof NAV_ITEMS[0]; active: boolean 
       <Link
         href={item.href}
         className={cn(
-          "group flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-colors duration-150 relative",
+          "group flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 relative",
           active
-            ? "text-primary font-medium bg-primary/[0.06]"
-            : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+            ? "text-primary font-medium bg-primary/5"
+            : "text-muted-foreground hover:text-foreground hover:bg-accent"
         )}
       >
         {active && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-primary" />
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
         )}
         <item.icon className={cn(
           "w-4 h-4 shrink-0 transition-colors",
@@ -67,7 +67,7 @@ function NavItem({ item, active }: { item: typeof NAV_ITEMS[0]; active: boolean 
 function SidebarSkeleton() {
   return (
     <div className="min-h-screen flex bg-background">
-      <aside className="w-60 bg-card border-r border-border flex flex-col">
+      <aside className="w-64 bg-card border-r border-border flex flex-col">
         <div className="h-14 flex items-center gap-2.5 px-4 border-b border-border">
           <div className="w-7 h-7 rounded-lg bg-muted animate-pulse" />
           <div className="space-y-1">
@@ -83,7 +83,7 @@ function SidebarSkeleton() {
       </aside>
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         <header className="h-14 bg-card border-b border-border" />
-        <div className="flex-1 p-6 space-y-4">
+        <div className="flex-1 p-8 space-y-4">
           <div className="h-6 w-32 bg-muted rounded animate-pulse" />
           <div className="h-4 w-48 bg-muted rounded animate-pulse" />
           <div className="h-48 bg-muted rounded-xl animate-pulse" />
@@ -105,8 +105,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Sidebar — 240px, compact */}
-      <aside className="w-60 bg-card border-r border-border flex flex-col shrink-0">
+      {/* Sidebar — 256px */}
+      <aside className="w-64 bg-card border-r border-border flex flex-col shrink-0">
         {/* Logo */}
         <div className="h-14 flex items-center gap-2.5 px-4 border-b border-border">
           <img src="/logo.svg" alt="Sesame" className="w-7 h-7" />
@@ -117,7 +117,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2.5">
+        <nav className="flex-1 overflow-y-auto py-3 px-2.5 scrollbar-gutter-stable">
           <ul className="space-y-0.5">
             {NAV_ITEMS.map((item) => (
               <NavItem key={item.href} item={item} active={pathname.startsWith(item.href)} />
@@ -144,11 +144,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {/* User */}
         <div className="p-3 border-t border-border">
           <div className="flex items-center gap-2.5 px-2 py-2">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
+            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
               {user?.user_id?.[0]?.toUpperCase() || "U"}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-[13px] font-medium text-foreground truncate leading-tight">
+              <div className="text-sm font-medium text-foreground truncate leading-tight">
                 {user?.user_id}
               </div>
               <div className="text-[11px] text-muted-foreground mt-0.5">
@@ -170,13 +170,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-        <header className="h-14 bg-card border-b border-border flex items-center px-6 shrink-0">
+        <header className="h-14 bg-card/80 backdrop-blur-sm border-b border-border flex items-center px-8 shrink-0">
           <h1 className="font-semibold text-foreground text-base tracking-tight">
             {pageTitle}
           </h1>
         </header>
         <div className="flex-1 overflow-y-auto">
-          <div className="p-6 max-w-[1400px]" key={pathname}>
+          <div className="p-8 max-w-[1440px]" key={pathname}>
             {children}
           </div>
         </div>

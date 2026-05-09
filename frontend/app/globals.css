@@ -7,6 +7,7 @@
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: var(--font-sans);
+    --font-mono: var(--font-mono);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -46,15 +47,22 @@
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
 
-    /* Custom design tokens */
+    /* Semantic colors */
     --color-success: var(--success);
     --color-success-foreground: var(--success-foreground);
     --color-warning: var(--warning);
     --color-warning-foreground: var(--warning-foreground);
+
+    /* Shadow depth system */
+    --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.04);
+    --shadow-sm: 0 1px 3px oklch(0 0 0 / 0.06), 0 1px 2px oklch(0 0 0 / 0.04);
+    --shadow-md: 0 4px 6px -1px oklch(0 0 0 / 0.06), 0 2px 4px -2px oklch(0 0 0 / 0.04);
+    --shadow-lg: 0 10px 15px -3px oklch(0 0 0 / 0.06), 0 4px 6px -4px oklch(0 0 0 / 0.04);
+    --shadow-xl: 0 20px 25px -5px oklch(0 0 0 / 0.08), 0 8px 10px -6px oklch(0 0 0 / 0.04);
 }
 
 :root {
-    /* Base palette — refined emerald + neutral slate */
+    /* Base palette — emerald + neutral slate */
     --background: oklch(0.985 0.002 247);
     --foreground: oklch(0.145 0.015 250);
     --card: oklch(1 0 0);
@@ -67,7 +75,7 @@
     --secondary-foreground: oklch(0.205 0.015 250);
     --muted: oklch(0.965 0.006 247);
     --muted-foreground: oklch(0.52 0.015 250);
-    --accent: oklch(0.965 0.006 247);
+    --accent: oklch(0.955 0.008 247);
     --accent-foreground: oklch(0.205 0.015 250);
     --destructive: oklch(0.577 0.245 27.325);
     --border: oklch(0.915 0.008 247);
@@ -78,7 +86,7 @@
     --warning: oklch(0.75 0.15 75);
     --warning-foreground: oklch(0.25 0.05 75);
 
-    /* Charts — distinct, accessible palette */
+    /* Charts — accessible palette */
     --chart-1: oklch(0.55 0.16 155);
     --chart-2: oklch(0.55 0.14 250);
     --chart-3: oklch(0.65 0.15 75);
@@ -88,7 +96,7 @@
     /* Layout */
     --radius: 0.625rem;
 
-    /* Sidebar — slightly cooler than main bg */
+    /* Sidebar */
     --sidebar: oklch(0.975 0.005 247);
     --sidebar-foreground: oklch(0.20 0.015 250);
     --sidebar-primary: oklch(0.55 0.16 155);
@@ -112,7 +120,7 @@
     --secondary-foreground: oklch(0.95 0.005 247);
     --muted: oklch(0.22 0.015 250);
     --muted-foreground: oklch(0.62 0.012 247);
-    --accent: oklch(0.22 0.015 250);
+    --accent: oklch(0.25 0.012 250);
     --accent-foreground: oklch(0.95 0.005 247);
     --destructive: oklch(0.65 0.22 25);
     --border: oklch(0.28 0.015 250);
@@ -131,7 +139,7 @@
     --sidebar-foreground: oklch(0.95 0.005 247);
     --sidebar-primary: oklch(0.65 0.17 155);
     --sidebar-primary-foreground: oklch(0.13 0.015 250);
-    --sidebar-accent: oklch(0.22 0.015 250);
+    --sidebar-accent: oklch(0.25 0.012 250);
     --sidebar-accent-foreground: oklch(0.95 0.005 247);
     --sidebar-border: oklch(0.28 0.015 250);
     --sidebar-ring: oklch(0.65 0.17 155);
@@ -146,6 +154,7 @@
   }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
   }
 }
 
@@ -160,12 +169,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.7 0 0 / 0.25);
+  background: oklch(0.7 0 0 / 0.2);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.5 0 0 / 0.4);
+  background: oklch(0.5 0 0 / 0.35);
 }
 
 /* ── Skeleton shimmer ── */
@@ -185,6 +194,16 @@
   animation: shimmer 1.8s ease-in-out infinite;
 }
 
+/* ── Status pulse ── */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.status-dot-active {
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
 /* ── Hover effects ── */
 .hover-lift {
   transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
@@ -193,20 +212,29 @@
 
 .hover-lift:hover {
   transform: translateY(-2px);
-  box-shadow:
-    0 4px 6px -1px oklch(0 0 0 / 0.05),
-    0 10px 15px -3px oklch(0 0 0 / 0.08);
+  box-shadow: var(--shadow-md);
 }
 
-/* ── Card hover glow (subtle emerald) ── */
 .hover-glow {
   transition: box-shadow 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .hover-glow:hover {
   box-shadow:
-    0 0 0 1px oklch(0.55 0.16 155 / 0.12),
-    0 4px 12px -2px oklch(0.55 0.16 155 / 0.08);
+    0 0 0 1px oklch(0.55 0.16 155 / 0.1),
+    0 4px 12px -2px oklch(0.55 0.16 155 / 0.06);
+}
+
+/* ── Code block ── */
+.code-block {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  background: oklch(0.17 0.015 250);
+  color: oklch(0.92 0.005 247);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  overflow-x: auto;
 }
 
 /* ── Reduced motion ── */
@@ -218,5 +246,8 @@
   .hover-glow:hover {
     transform: none;
     box-shadow: none;
+  }
+  .status-dot-active {
+    animation: none;
   }
 }
