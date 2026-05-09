@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "motion/react";
+import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { FileText, Search, ChevronLeft, ChevronRight } from "lucide-react";
@@ -85,8 +86,7 @@ export default function LogsPage() {
 
       {/* Filters */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        {...fadeInUp}
         className="flex flex-wrap gap-4 items-end"
       >
         <div className="space-y-2">
@@ -105,7 +105,7 @@ export default function LogsPage() {
           <Label>结束日期</Label>
           <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-40" />
         </div>
-        <Button onClick={handleSearch} className="bg-primary hover:bg-primary/90">
+        <Button onClick={handleSearch}>
           <Search className="w-4 h-4 mr-2" />
           搜索
         </Button>
@@ -113,15 +113,14 @@ export default function LogsPage() {
 
       {/* Table */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        {...fadeInUp}
+        transition={{ ...fadeInUp.transition, delay: 0.1 }}
       >
-        <Card className="border-0 shadow-sm">
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50/80">
+                <TableRow className="bg-muted/30">
                   <TableHead className="font-semibold text-foreground h-12">时间</TableHead>
                   <TableHead className="font-semibold text-foreground">用户</TableHead>
                   <TableHead className="font-semibold text-foreground">请求模型</TableHead>
@@ -160,10 +159,9 @@ export default function LogsPage() {
                   logs.map((log, i) => (
                     <motion.tr
                       key={log.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.02 }}
-                      className="border-b transition-colors hover:bg-slate-50"
+                      {...fadeInUp}
+                      transition={{ ...fadeInUp.transition, delay: i * 0.02 }}
+                      className="border-b transition-colors hover:bg-accent/50"
                     >
                       <TableCell className="text-sm text-muted-foreground">
                         {log.created_at ? new Date(log.created_at).toLocaleString() : "-"}
@@ -188,7 +186,7 @@ export default function LogsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className={`text-sm ${log.latency_ms && log.latency_ms > 5000 ? 'text-red-500' : ''}`}>
+                        <span className={`text-sm ${log.latency_ms && log.latency_ms > 5000 ? 'text-destructive' : ''}`}>
                           {log.latency_ms ? `${log.latency_ms}ms` : "-"}
                         </span>
                       </TableCell>
@@ -198,7 +196,7 @@ export default function LogsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={log.is_stream ? "secondary" : "outline"} className="text-[10px]">
+                        <Badge variant={log.is_stream ? "secondary" : "outline"} className="text-[11px]">
                           {log.is_stream ? "流式" : "非流式"}
                         </Badge>
                       </TableCell>

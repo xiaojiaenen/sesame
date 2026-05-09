@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "motion/react";
+import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { ArrowLeftRight, Plus, X } from "lucide-react";
@@ -95,7 +96,7 @@ export default function ModelMappingPage() {
         title="模型映射"
         description="配置对外暴露模型与内部真实模型的映射关系，支持设置 fallback 模型"
         action={
-          <Button onClick={() => setIsOpen(true)} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => setIsOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             添加映射
           </Button>
@@ -103,15 +104,14 @@ export default function ModelMappingPage() {
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        {...fadeInUp}
+        transition={{ ...fadeInUp.transition, delay: 0.1 }}
       >
-        <Card className="border-0 shadow-sm">
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50/80">
+                <TableRow className="bg-muted/30">
                   <TableHead className="font-semibold text-foreground h-12">对外暴露模型</TableHead>
                   <TableHead className="font-semibold text-foreground">内部模型</TableHead>
                   <TableHead className="font-semibold text-foreground">Fallback 模型</TableHead>
@@ -142,10 +142,9 @@ export default function ModelMappingPage() {
                   mappings.map((m, i) => (
                     <motion.tr
                       key={m.external_model}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-slate-50"
+                      {...fadeInUp}
+                      transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
+                      className="border-b transition-colors hover:bg-accent/50"
                     >
                       <TableCell className="font-medium font-mono text-sm">{m.external_model}</TableCell>
                       <TableCell className="text-muted-foreground font-mono text-sm">{m.internal_model}</TableCell>

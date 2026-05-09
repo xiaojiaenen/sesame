@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { motion } from "motion/react";
+import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Network } from "lucide-react";
@@ -73,15 +74,14 @@ export default function AdminSessionsPage() {
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        {...fadeInUp}
+        transition={{ ...fadeInUp.transition, delay: 0.1 }}
       >
-        <Card className="border-0 shadow-sm">
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50/80">
+                <TableRow className="bg-muted/30">
                   <TableHead className="font-semibold text-foreground h-12">用户 ID</TableHead>
                   <TableHead className="font-semibold text-foreground">状态</TableHead>
                   <TableHead className="font-semibold text-foreground">最后一次使用时间</TableHead>
@@ -114,10 +114,9 @@ export default function AdminSessionsPage() {
                   sessions.map((s, i) => (
                     <motion.tr
                       key={i}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-slate-50"
+                      {...fadeInUp}
+                      transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
+                      className="border-b transition-colors hover:bg-accent/50"
                     >
                       <TableCell className="font-medium">{s.user_id}</TableCell>
                       <TableCell>

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "motion/react";
+import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Users, ChevronLeft, ChevronRight } from "lucide-react";
@@ -87,22 +88,21 @@ export default function AdminUsersPage() {
         title="用户管理"
         description="管理系统用户账户"
         action={
-          <Button onClick={() => setIsCreateOpen(true)} className="bg-primary hover:bg-primary/90">
+          <Button onClick={() => setIsCreateOpen(true)}>
             创建用户
           </Button>
         }
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        {...fadeInUp}
+        transition={{ ...fadeInUp.transition, delay: 0.1 }}
       >
-        <Card className="border-0 shadow-sm">
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50/80">
+                <TableRow className="bg-muted/30">
                   <TableHead className="font-semibold text-foreground h-12">用户名</TableHead>
                   <TableHead className="font-semibold text-foreground">角色</TableHead>
                   <TableHead className="font-semibold text-foreground">状态</TableHead>
@@ -135,10 +135,9 @@ export default function AdminUsersPage() {
                   users.map((u, i) => (
                     <motion.tr
                       key={u.user_id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-slate-50"
+                      {...fadeInUp}
+                      transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
+                      className="border-b transition-colors hover:bg-accent/50"
                     >
                       <TableCell className="font-medium">{u.user_id}</TableCell>
                       <TableCell>

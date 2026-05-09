@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { motion } from "motion/react";
+import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Server, Plus, Trash2, Edit, RefreshCw, X, Key, Cookie, ChevronLeft, ChevronRight } from "lucide-react";
@@ -232,12 +233,12 @@ export default function ChannelsPage() {
     return (
       <div className="flex flex-wrap gap-1 max-w-[240px]">
         {mappings.slice(0, 2).map((m) => (
-          <Badge key={m.accept} variant="secondary" className="text-[10px]">
+          <Badge key={m.accept} variant="secondary" className="text-[11px]">
             {hasMapping && m.accept !== m.backend ? `${m.accept}→${m.backend}` : m.accept}
           </Badge>
         ))}
         {mappings.length > 2 && (
-          <Badge variant="secondary" className="text-[10px]">+{mappings.length - 2}</Badge>
+          <Badge variant="secondary" className="text-[11px]">+{mappings.length - 2}</Badge>
         )}
       </div>
     );
@@ -249,7 +250,7 @@ export default function ChannelsPage() {
         title="渠道管理"
         description="管理后端 API 渠道，支持模型映射和负载均衡"
         action={
-          <Button onClick={openCreate} className="bg-primary hover:bg-primary/90">
+          <Button onClick={openCreate}>
             <Plus className="w-4 h-4 mr-2" />
             添加渠道
           </Button>
@@ -257,15 +258,14 @@ export default function ChannelsPage() {
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        {...fadeInUp}
+        transition={{ ...fadeInUp.transition, delay: 0.1 }}
       >
-        <Card className="border-0 shadow-sm">
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50/80">
+                <TableRow className="bg-muted/30">
                   <TableHead className="font-semibold text-foreground h-12">名称</TableHead>
                   <TableHead className="font-semibold text-foreground">认证类型</TableHead>
                   <TableHead className="font-semibold text-foreground">Base URL</TableHead>
@@ -304,10 +304,9 @@ export default function ChannelsPage() {
                   channels.map((ch, i) => (
                     <motion.tr
                       key={ch.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-slate-50"
+                      {...fadeInUp}
+                      transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
+                      className="border-b transition-colors hover:bg-accent/50"
                     >
                       <TableCell className="font-medium">{ch.name}</TableCell>
                       <TableCell>
@@ -343,7 +342,7 @@ export default function ChannelsPage() {
                           <Button variant="ghost" size="sm" onClick={() => handleEdit(ch)}>
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(ch.id)} className="text-red-500 hover:text-red-700">
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(ch.id)} className="text-destructive hover:text-destructive">
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
@@ -444,7 +443,7 @@ export default function ChannelsPage() {
                 </Button>
               </div>
               {modelMappings.length > 0 && (
-                <div className="space-y-1 mt-2 p-3 bg-slate-50 rounded-lg">
+                <div className="space-y-1 mt-2 p-3 bg-muted rounded-lg">
                   {modelMappings.map(m => (
                     <div key={m.accept} className="flex items-center justify-between text-sm group">
                       <div className="flex items-center gap-2">
@@ -454,7 +453,7 @@ export default function ChannelsPage() {
                       </div>
                       <button
                         onClick={() => removeModelMapping(m.accept)}
-                        className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity"
+                        className="opacity-0 group-hover:opacity-100 text-destructive hover:text-destructive transition-opacity"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>

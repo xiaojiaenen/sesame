@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { motion } from "motion/react";
+import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Key, ChevronLeft, ChevronRight } from "lucide-react";
@@ -62,15 +63,14 @@ export default function AdminApiKeysPage() {
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        {...fadeInUp}
+        transition={{ ...fadeInUp.transition, delay: 0.1 }}
       >
-        <Card className="border-0 shadow-sm">
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50/80">
+                <TableRow className="bg-muted/30">
                   <TableHead className="font-semibold text-foreground h-12">所属用户</TableHead>
                   <TableHead className="font-semibold text-foreground">名称</TableHead>
                   <TableHead className="font-semibold text-foreground">前缀</TableHead>
@@ -105,10 +105,9 @@ export default function AdminApiKeysPage() {
                   keys.map((k, i) => (
                     <motion.tr
                       key={k.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-slate-50"
+                      {...fadeInUp}
+                      transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
+                      className="border-b transition-colors hover:bg-accent/50"
                     >
                       <TableCell className="font-medium">{k.user_id}</TableCell>
                       <TableCell>{k.name || "-"}</TableCell>
@@ -117,7 +116,7 @@ export default function AdminApiKeysPage() {
                         <div className="flex flex-wrap gap-1">
                           {(!k.allowed_models || k.allowed_models.length === 0) && <span className="text-xs text-muted-foreground">所有模型</span>}
                           {k.allowed_models?.map((m: string) => (
-                            <Badge key={m} variant="secondary" className="text-[10px]">
+                            <Badge key={m} variant="secondary" className="text-[11px]">
                               {m}
                             </Badge>
                           ))}

@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { motion } from "motion/react";
+import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Route } from "lucide-react";
@@ -120,22 +121,21 @@ export default function ProxyRoutesPage() {
         title="代理路由"
         description="配置 API 请求的代理转发规则"
         action={
-          <Button onClick={openCreate} className="bg-primary hover:bg-primary/90">
+          <Button onClick={openCreate}>
             添加路由
           </Button>
         }
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        {...fadeInUp}
+        transition={{ ...fadeInUp.transition, delay: 0.1 }}
       >
-        <Card className="border-0 shadow-sm">
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50/80">
+                <TableRow className="bg-muted/30">
                   <TableHead className="font-semibold text-foreground h-12">触发路径</TableHead>
                   <TableHead className="font-semibold text-foreground">目标路径</TableHead>
                   <TableHead className="font-semibold text-foreground">方法</TableHead>
@@ -172,10 +172,9 @@ export default function ProxyRoutesPage() {
                   routes.map((r, i) => (
                     <motion.tr
                       key={r.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-slate-50"
+                      {...fadeInUp}
+                      transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
+                      className="border-b transition-colors hover:bg-accent/50"
                     >
                       <TableCell className="font-medium font-mono text-sm">{r.path}</TableCell>
                       <TableCell className="font-mono text-sm text-muted-foreground">{r.backend_path}</TableCell>
