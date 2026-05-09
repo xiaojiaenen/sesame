@@ -47,18 +47,29 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-background">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center gap-4"
-        >
-          <img src="/logo.svg" alt="Sesame" className="w-16 h-16" />
-          <div className="flex flex-col items-center gap-1">
-            <span className="text-lg font-semibold text-foreground">Sesame Gateway</span>
-            <span className="text-sm text-muted-foreground">加载中...</span>
+      <div className="min-h-screen flex bg-background">
+        <aside className="w-64 bg-card border-r border-border flex flex-col shadow-sm">
+          <div className="h-16 flex items-center gap-3 px-5 border-b border-border">
+            <img src="/logo.svg" alt="Sesame" className="w-9 h-9" />
+            <div>
+              <div className="font-bold text-foreground text-sm">Sesame</div>
+              <div className="text-[10px] text-muted-foreground -mt-0.5">Gateway Console</div>
+            </div>
           </div>
-        </motion.div>
+          <div className="flex-1 p-3 space-y-2 animate-pulse">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-10 bg-slate-100 rounded-xl" />
+            ))}
+          </div>
+        </aside>
+        <main className="flex-1 flex flex-col h-screen overflow-hidden">
+          <header className="h-16 bg-card/80 border-b border-border" />
+          <div className="flex-1 p-8 animate-pulse space-y-6">
+            <div className="h-7 w-40 bg-slate-200 rounded-lg" />
+            <div className="h-4 w-64 bg-slate-100 rounded-lg" />
+            <div className="h-64 bg-slate-100 rounded-xl" />
+          </div>
+        </main>
       </div>
     );
   }
@@ -196,15 +207,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </motion.h1>
         </header>
         <div className="flex-1 overflow-y-auto">
-          <motion.div
-            key={pathname}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.12 }}
-            className="p-8"
-          >
+          <div className="p-8" key={pathname}>
             {children}
-          </motion.div>
+          </div>
         </div>
       </main>
     </div>
