@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
+import { fadeInUp } from "@/lib/animations";
 import { Eye, EyeOff, Lock, User } from "lucide-react";
 
 export default function LoginPage() {
@@ -46,14 +47,12 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted/30">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+        {...fadeInUp}
         className="w-full max-w-md mx-4"
       >
-        <div className="bg-card rounded-xl shadow-lg border border-border p-8">
+        <div className="bg-card rounded-xl shadow-xl ring-1 ring-border/40 p-8">
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
             <img src="/logo.svg" alt="Sesame" className="w-20 h-20 mb-5" />
@@ -92,7 +91,7 @@ export default function LoginPage() {
                   className={`h-12 pl-10 bg-background border-border transition-all duration-200 ${
                     focusedField === "userId"
                       ? "border-primary ring-2 ring-primary/20"
-                      : "hover:border-slate-300"
+                      : "hover:border-border"
                   }`}
                 />
               </div>
@@ -125,7 +124,7 @@ export default function LoginPage() {
                   className={`h-12 pl-10 pr-10 bg-background border-border transition-all duration-200 ${
                     focusedField === "password"
                       ? "border-primary ring-2 ring-primary/20"
-                      : "hover:border-slate-300"
+                      : "hover:border-border"
                   }`}
                 />
                 <button
