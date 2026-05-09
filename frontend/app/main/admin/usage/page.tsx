@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "motion/react";
+import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { BarChart3, TrendingUp, Users, Cpu, Clock } from "lucide-react";
 import {
@@ -38,7 +39,16 @@ interface UserStats {
   avg_latency_ms: number;
 }
 
-const COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16'];
+const COLORS = [
+  'oklch(0.55 0.16 155)',   // chart-1 / primary
+  'oklch(0.55 0.14 250)',   // chart-2 / blue
+  'oklch(0.55 0.18 300)',   // chart-4 / violet
+  'oklch(0.65 0.15 75)',    // chart-3 / warning
+  'oklch(0.577 0.245 27)',  // destructive
+  'oklch(0.60 0.20 340)',   // pink
+  'oklch(0.60 0.12 200)',   // cyan
+  'oklch(0.60 0.16 130)',   // lime
+];
 
 export default function UsagePage() {
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
@@ -131,9 +141,9 @@ export default function UsagePage() {
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-5">
+        <motion.div {...fadeInUp}>
+          <Card className="ring-1 ring-border/40 shadow-xs">
+            <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                   <TrendingUp className="w-5 h-5 text-primary" />
@@ -149,9 +159,9 @@ export default function UsagePage() {
           </Card>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-5">
+        <motion.div {...fadeInUp}>
+          <Card className="ring-1 ring-border/40 shadow-xs">
+            <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                   <BarChart3 className="w-5 h-5 text-primary" />
@@ -167,9 +177,9 @@ export default function UsagePage() {
           </Card>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-5">
+        <motion.div {...fadeInUp}>
+          <Card className="ring-1 ring-border/40 shadow-xs">
+            <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                   <Clock className="w-5 h-5 text-primary" />
@@ -185,12 +195,12 @@ export default function UsagePage() {
           </Card>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-5">
+        <motion.div {...fadeInUp}>
+          <Card className="ring-1 ring-border/40 shadow-xs">
+            <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-red-500" />
+                <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-destructive" />
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">错误数</div>
@@ -205,8 +215,8 @@ export default function UsagePage() {
       </div>
 
       {/* Daily Requests Chart */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-        <Card className="border-0 shadow-sm">
+      <motion.div {...fadeInUp}>
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardHeader>
             <CardTitle className="text-lg">每日请求量</CardTitle>
           </CardHeader>
@@ -222,7 +232,7 @@ export default function UsagePage() {
                   <XAxis dataKey="date" className="text-xs" tick={{ fill: 'var(--muted-foreground)' }} />
                   <YAxis className="text-xs" tick={{ fill: 'var(--muted-foreground)' }} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="requests" name="请求数" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="requests" name="请求数" fill="oklch(0.62 0.17 155)" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -231,8 +241,8 @@ export default function UsagePage() {
       </motion.div>
 
       {/* Token Consumption Chart */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-        <Card className="border-0 shadow-sm">
+      <motion.div {...fadeInUp}>
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardHeader>
             <CardTitle className="text-lg">每日 Token 消耗 (K)</CardTitle>
           </CardHeader>
@@ -249,7 +259,7 @@ export default function UsagePage() {
                   <YAxis className="text-xs" tick={{ fill: 'var(--muted-foreground)' }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend />
-                  <Line type="monotone" dataKey="tokens" name="Token 消耗 (K)" stroke="#10b981" strokeWidth={2} dot={{ fill: '#10b981' }} />
+                  <Line type="monotone" dataKey="tokens" name="Token 消耗 (K)" stroke="oklch(0.62 0.17 155)" strokeWidth={2} dot={{ fill: 'oklch(0.62 0.17 155)' }} />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -259,8 +269,8 @@ export default function UsagePage() {
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Model Stats Pie Chart */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <Card className="border-0 shadow-sm">
+        <motion.div {...fadeInUp}>
+          <Card className="ring-1 ring-border/40 shadow-xs">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Cpu className="w-5 h-5" />
@@ -320,8 +330,8 @@ export default function UsagePage() {
         </motion.div>
 
         {/* User Stats Bar Chart */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
-          <Card className="border-0 shadow-sm">
+        <motion.div {...fadeInUp}>
+          <Card className="ring-1 ring-border/40 shadow-xs">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Users className="w-5 h-5" />
@@ -352,7 +362,7 @@ export default function UsagePage() {
                       }
                       return null;
                     }} />
-                    <Bar dataKey="tokens" name="Token 消耗" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                    <Bar dataKey="tokens" name="Token 消耗" fill="oklch(0.55 0.14 250)" radius={[0, 4, 4, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -362,8 +372,8 @@ export default function UsagePage() {
       </div>
 
       {/* Latency Chart */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-        <Card className="border-0 shadow-sm">
+      <motion.div {...fadeInUp}>
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardHeader>
             <CardTitle className="text-lg">每日平均延迟 (ms)</CardTitle>
           </CardHeader>
@@ -379,8 +389,8 @@ export default function UsagePage() {
                   <XAxis dataKey="date" className="text-xs" tick={{ fill: 'var(--muted-foreground)' }} />
                   <YAxis className="text-xs" tick={{ fill: 'var(--muted-foreground)' }} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="latency" name="延迟 (ms)" stroke="#f59e0b" strokeWidth={2} dot={{ fill: '#f59e0b' }} />
-                  <Line type="monotone" dataKey="errors" name="错误数" stroke="#ef4444" strokeWidth={2} dot={{ fill: '#ef4444' }} />
+                  <Line type="monotone" dataKey="latency" name="延迟 (ms)" stroke="oklch(0.65 0.15 75)" strokeWidth={2} dot={{ fill: 'oklch(0.65 0.15 75)' }} />
+                  <Line type="monotone" dataKey="errors" name="错误数" stroke="oklch(0.577 0.245 27)" strokeWidth={2} dot={{ fill: 'oklch(0.577 0.245 27)' }} />
                 </LineChart>
               </ResponsiveContainer>
             )}

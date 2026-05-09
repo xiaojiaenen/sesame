@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "motion/react";
+import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { Activity, Wifi, WifiOff, Trash2, Clock, Zap, AlertTriangle } from "lucide-react";
 
@@ -149,16 +150,16 @@ export default function MonitorPage() {
 
   const getEventColor = (type: string) => {
     switch (type) {
-      case 'request_start': return 'bg-blue-500';
-      case 'request_end': return 'bg-emerald-500';
-      case 'request_error': return 'bg-red-500';
-      default: return 'bg-slate-500';
+      case 'request_start': return 'bg-primary';
+      case 'request_end': return 'bg-success';
+      case 'request_error': return 'bg-destructive';
+      default: return 'bg-muted-foreground';
     }
   };
 
   const getEventBadge = (type: string) => {
     switch (type) {
-      case 'request_start': return <Badge variant="secondary" className="bg-blue-100 text-blue-700">开始</Badge>;
+      case 'request_start': return <Badge variant="secondary" className="bg-primary/10 text-primary">开始</Badge>;
       case 'request_end': return <Badge variant="default">完成</Badge>;
       case 'request_error': return <Badge variant="destructive">错误</Badge>;
       default: return <Badge variant="outline">{type}</Badge>;
@@ -190,16 +191,16 @@ export default function MonitorPage() {
               <Trash2 className="w-4 h-4 mr-2" />
               清空
             </Button>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted">
               {connected ? (
                 <>
-                  <Wifi className="w-4 h-4 text-emerald-500" />
-                  <span className="text-sm text-emerald-700">已连接</span>
+                  <Wifi className="w-4 h-4 text-success" />
+                  <span className="text-sm text-success">已连接</span>
                 </>
               ) : (
                 <>
-                  <WifiOff className="w-4 h-4 text-red-500" />
-                  <span className="text-sm text-red-700">未连接</span>
+                  <WifiOff className="w-4 h-4 text-destructive" />
+                  <span className="text-sm text-destructive">未连接</span>
                 </>
               )}
             </div>
@@ -209,9 +210,9 @@ export default function MonitorPage() {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-5">
+        <motion.div {...fadeInUp}>
+          <Card className="ring-1 ring-border/40 shadow-xs">
+            <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                   <Activity className="w-5 h-5 text-primary" />
@@ -225,12 +226,12 @@ export default function MonitorPage() {
           </Card>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-5">
+        <motion.div {...fadeInUp}>
+          <Card className="ring-1 ring-border/40 shadow-xs">
+            <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                  <Zap className="w-5 h-5 text-blue-600" />
+                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Zap className="w-5 h-5 text-primary" />
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">进行中</div>
@@ -241,12 +242,12 @@ export default function MonitorPage() {
           </Card>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-5">
+        <motion.div {...fadeInUp}>
+          <Card className="ring-1 ring-border/40 shadow-xs">
+            <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-amber-600" />
+                <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-warning" />
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">平均延迟</div>
@@ -257,12 +258,12 @@ export default function MonitorPage() {
           </Card>
         </motion.div>
 
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
-          <Card className="border-0 shadow-sm">
-            <CardContent className="p-5">
+        <motion.div {...fadeInUp}>
+          <Card className="ring-1 ring-border/40 shadow-xs">
+            <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
                 </div>
                 <div>
                   <div className="text-sm text-muted-foreground">错误数</div>
@@ -275,8 +276,8 @@ export default function MonitorPage() {
       </div>
 
       {/* Events Stream */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-        <Card className="border-0 shadow-sm">
+      <motion.div {...fadeInUp}>
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
               <Activity className="w-5 h-5" />
@@ -298,7 +299,7 @@ export default function MonitorPage() {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0 }}
-                      className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
+                      className="flex items-start gap-3 p-3 rounded-lg bg-muted hover:bg-accent transition-colors"
                     >
                       <div className={`w-2 h-2 rounded-full mt-2 ${getEventColor(event.type)}`} />
                       <div className="flex-1 min-w-0">
@@ -328,7 +329,7 @@ export default function MonitorPage() {
                           {event.data.latency_ms > 0 && (
                             <span>
                               <span className="text-muted-foreground">延迟: </span>
-                              <span className={`font-medium ${event.data.latency_ms > 5000 ? 'text-red-500' : ''}`}>
+                              <span className={`font-medium ${event.data.latency_ms > 5000 ? 'text-destructive' : ''}`}>
                                 {event.data.latency_ms}ms
                               </span>
                             </span>
@@ -337,7 +338,7 @@ export default function MonitorPage() {
                             <Badge variant="secondary" className="text-xs">流式</Badge>
                           )}
                           {event.data.error_message && (
-                            <span className="text-red-500 text-xs">
+                            <span className="text-destructive text-xs">
                               {event.data.error_message}
                             </span>
                           )}
