@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api";
+import { fadeInUp } from "@/lib/animations";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -19,7 +20,7 @@ function StatCard({ icon: Icon, label, value, loading, color = "primary", href }
 }) {
   const content = (
     <Card className="border-border/50 hover-glow transition-all duration-200 h-full">
-      <CardContent className="p-5">
+      <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
@@ -100,16 +101,16 @@ export default function DashboardPage() {
 
       {/* Alert Banner */}
       {!loading && !cookieOk && (
-        <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5 text-amber-600" />
+        <div className="bg-warning/5 border border-warning/20 rounded-xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5 text-warning" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-amber-800">Cookie 未配置或已失效</div>
-            <div className="text-xs text-amber-600 mt-0.5">请先提交企业 AI Cookie 才能使用代理服务</div>
+            <div className="text-sm font-semibold text-warning">Cookie 未配置或已失效</div>
+            <div className="text-xs text-warning/70 mt-0.5">请先提交企业 AI Cookie 才能使用代理服务</div>
           </div>
           <Link href="/main/channels">
-            <Button size="sm" className="bg-amber-500 hover:bg-amber-600 shrink-0">
+            <Button size="sm" className="bg-warning hover:bg-warning/80 shrink-0">
               去配置 <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </Button>
           </Link>
@@ -120,7 +121,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* User Card — spans 2 cols */}
         <Card className="border-border/50 md:col-span-2">
-          <CardContent className="p-5 flex items-center gap-4">
+          <CardContent className="p-4 flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <span className="text-lg font-bold text-primary">
                 {user?.user_id?.[0]?.toUpperCase() || "U"}

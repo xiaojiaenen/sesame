@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "motion/react";
+import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import {
@@ -130,8 +131,8 @@ export default function ApiKeysPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="API Key 管理" 
+      <PageHeader
+        title="API Key 管理"
         description="创建和管理您的 API 访问密钥"
         action={
           <Button
@@ -144,27 +145,23 @@ export default function ApiKeysPage() {
         }
       />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <Card className="border-0 shadow-sm overflow-hidden">
+      <motion.div {...fadeInUp}>
+        <Card className="ring-1 ring-border/40 shadow-xs overflow-hidden">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50/80">
-                  <TableHead className="font-semibold text-slate-700 h-12">
+                <TableRow className="bg-muted/30">
+                  <TableHead className="font-semibold text-foreground h-12">
                     <div className="flex items-center gap-2">
-                      <Key className="w-4 h-4 text-slate-400" />
+                      <Key className="w-4 h-4 text-muted-foreground" />
                       名称
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold text-slate-700">前缀</TableHead>
-                  <TableHead className="font-semibold text-slate-700">可用模型</TableHead>
-                  <TableHead className="font-semibold text-slate-700">QPM</TableHead>
-                  <TableHead className="font-semibold text-slate-700">状态</TableHead>
-                  <TableHead className="font-semibold text-slate-700 text-right">操作</TableHead>
+                  <TableHead className="font-semibold text-foreground">前缀</TableHead>
+                  <TableHead className="font-semibold text-foreground">可用模型</TableHead>
+                  <TableHead className="font-semibold text-foreground">QPM</TableHead>
+                  <TableHead className="font-semibold text-foreground">状态</TableHead>
+                  <TableHead className="font-semibold text-foreground text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -183,11 +180,11 @@ export default function ApiKeysPage() {
                   <TableRow>
                     <TableCell colSpan={6}>
                       <EmptyState
-                        icon={<Key className="w-8 h-8 text-slate-400" />}
+                        icon={<Key className="w-8 h-8 text-muted-foreground" />}
                         title="还没有创建任何 Key"
                         description="创建一个 API Key 来开始使用 Sesame Gateway"
                         action={
-                          <Button 
+                          <Button
                             onClick={() => setIsCreateOpen(true)}
                             variant="outline"
                           >
@@ -202,39 +199,38 @@ export default function ApiKeysPage() {
                   keys.map((k: any, i) => (
                     <motion.tr
                       key={k.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-slate-50/50"
+                      {...fadeInUp}
+                      transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
+                      className="border-b transition-colors hover:bg-accent/50"
                     >
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                            <Key className="w-4 h-4 text-slate-500" />
+                          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                            <Key className="w-4 h-4 text-muted-foreground" />
                           </div>
                           <span className="font-medium text-foreground">{k.name || "未命名"}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <code className="px-2 py-1 bg-slate-100 rounded text-xs font-mono text-slate-600">
+                        <code className="px-2 py-1 bg-muted rounded text-xs font-mono text-foreground">
                           {k.key_prefix}
                         </code>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1 max-w-[200px]">
                           {(!k.allowed_models || k.allowed_models.length === 0) ? (
-                            <Badge variant="secondary" className="text-xs bg-emerald-50 text-emerald-700">
+                            <Badge variant="secondary" className="text-xs bg-success/10 text-success">
                               所有权限
                             </Badge>
                           ) : (
                             k.allowed_models.slice(0, 2).map((m: string) => (
-                              <Badge key={m} variant="secondary" className="text-[10px]">
+                              <Badge key={m} variant="secondary" className="text-[11px]">
                                 {m}
                               </Badge>
                             ))
                           )}
                           {k.allowed_models?.length > 2 && (
-                            <Badge variant="secondary" className="text-[10px]">
+                            <Badge variant="secondary" className="text-[11px]">
                               +{k.allowed_models.length - 2}
                             </Badge>
                           )}
@@ -243,15 +239,15 @@ export default function ApiKeysPage() {
                       <TableCell>
                         <div className="flex items-center gap-1">
                           <span className="font-mono text-sm">{k.max_qpm}</span>
-                          <span className="text-xs text-slate-400">/分</span>
+                          <span className="text-xs text-muted-foreground">/分</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge 
+                        <Badge
                           variant={k.is_active ? "default" : "secondary"}
-                          className={k.is_active ? "bg-emerald-100 text-emerald-700" : ""}
+                          className={k.is_active ? "bg-success/10 text-success" : ""}
                         >
-                          <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${k.is_active ? "bg-emerald-500" : "bg-slate-400"}`} />
+                          <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${k.is_active ? "bg-success" : "bg-muted-foreground"}`} />
                           {k.is_active ? "启用" : "禁用"}
                         </Badge>
                       </TableCell>
@@ -262,7 +258,7 @@ export default function ApiKeysPage() {
                             size="sm"
                             onClick={() => handleCopyKey(k.id)}
                             disabled={copyingKeyId === k.id}
-                            className="text-slate-500 hover:text-foreground hover:bg-slate-100"
+                            className="text-muted-foreground hover:text-foreground hover:bg-muted"
                           >
                             {copyingKeyId === k.id ? (
                               <Check className="w-4 h-4" />
@@ -274,7 +270,7 @@ export default function ApiKeysPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => toggleActive(k.id, k.is_active)}
-                            className={k.is_active ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"}
+                            className={k.is_active ? "text-warning hover:text-warning hover:bg-warning/10" : "text-success hover:text-success hover:bg-success/10"}
                           >
                             {k.is_active ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
                           </Button>
@@ -282,7 +278,7 @@ export default function ApiKeysPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(k.id)}
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
@@ -311,19 +307,18 @@ export default function ApiKeysPage() {
               创建一个新的 API Key 用于访问 Sesame Gateway
             </DialogDescription>
           </DialogHeader>
-          
+
           {createdKey ? (
             <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
+              {...fadeInUp}
               className="space-y-4"
             >
-              <div className="p-6 bg-emerald-50 rounded-xl text-center border border-emerald-200">
+              <div className="p-6 bg-success/5 rounded-xl text-center border border-success/20">
                 <div className="flex items-center justify-center gap-2 mb-3">
-                  <Check className="w-5 h-5 text-emerald-500" />
-                  <span className="text-sm font-medium text-emerald-700">创建成功！</span>
+                  <Check className="w-5 h-5 text-success" />
+                  <span className="text-sm font-medium text-success">创建成功！</span>
                 </div>
-                <div className="p-3 bg-white rounded-lg border border-emerald-200">
+                <div className="p-3 bg-white rounded-lg border border-success/20">
                   <code className="text-sm font-mono break-all text-foreground">{createdKey}</code>
                 </div>
                 <Button
@@ -344,9 +339,9 @@ export default function ApiKeysPage() {
                   )}
                 </Button>
               </div>
-              <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
-                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                <p className="text-sm text-amber-700">
+              <div className="flex items-start gap-2 p-3 bg-warning/5 rounded-lg border border-warning/20">
+                <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
+                <p className="text-sm text-warning">
                   请妥善保存此 Key，关闭弹窗后将无法再次查看！
                 </p>
               </div>
@@ -357,42 +352,42 @@ export default function ApiKeysPage() {
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-slate-600">名称 (可选)</Label>
-                <Input 
-                  value={newName} 
-                  onChange={e => setNewName(e.target.value)} 
+                <Label className="text-foreground">名称 (可选)</Label>
+                <Input
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
                   placeholder="我的测试 Key"
-                  className="bg-slate-50/50"
+                  className="bg-muted/30"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-slate-600">每分钟请求限制 (QPM)</Label>
-                <Input 
-                  type="number" 
-                  value={newQpm} 
+                <Label className="text-foreground">每分钟请求限制 (QPM)</Label>
+                <Input
+                  type="number"
+                  value={newQpm}
                   onChange={e => setNewQpm(e.target.value)}
-                  className="bg-slate-50/50"
+                  className="bg-muted/30"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-slate-600">有效天数 (可选，留空为永久)</Label>
-                <Input 
-                  type="number" 
-                  value={newExpire} 
+                <Label className="text-foreground">有效天数 (可选，留空为永久)</Label>
+                <Input
+                  type="number"
+                  value={newExpire}
                   onChange={e => setNewExpire(e.target.value)}
                   placeholder="30"
-                  className="bg-slate-50/50"
+                  className="bg-muted/30"
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-slate-600">允许的模型 (不选则拥有所有权限)</Label>
-                <div className="max-h-48 overflow-y-auto space-y-2 border border-slate-200 p-3 rounded-xl bg-slate-50/50">
+                <Label className="text-foreground">允许的模型 (不选则拥有所有权限)</Label>
+                <div className="max-h-48 overflow-y-auto space-y-2 border border-border p-3 rounded-xl bg-muted/30">
                   {models.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-4">暂无可用模型</p>
+                    <p className="text-sm text-muted-foreground text-center py-4">暂无可用模型</p>
                   ) : (
                     models.map((m: any) => (
                       <div key={m.external_model} className="flex items-center space-x-2 p-2 hover:bg-white rounded-lg transition-colors">
-                        <Checkbox 
+                        <Checkbox
                           id={`model-${m.external_model}`}
                           checked={newModels.includes(m.external_model)}
                           onCheckedChange={(checked) => {

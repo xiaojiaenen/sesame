@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "motion/react";
+import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { List, ArrowRight, Box, Cpu } from "lucide-react";
@@ -32,36 +33,32 @@ export default function ModelsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
-        title="模型列表" 
+      <PageHeader
+        title="模型列表"
         description="查看可用的 AI 模型及其映射关系"
       />
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <Card className="border-0 shadow-sm overflow-hidden">
+      <motion.div {...fadeInUp}>
+        <Card className="ring-1 ring-border/40 shadow-xs overflow-hidden">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-slate-50/80">
-                  <TableHead className="font-semibold text-slate-700 h-12">
+                <TableRow className="bg-muted/30">
+                  <TableHead className="font-semibold text-foreground h-12">
                     <div className="flex items-center gap-2">
-                      <Box className="w-4 h-4 text-slate-400" />
+                      <Box className="w-4 h-4 text-muted-foreground" />
                       对外暴露模型
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold text-slate-700 h-12">
+                  <TableHead className="font-semibold text-foreground h-12">
                     <div className="flex items-center gap-2">
-                      <ArrowRight className="w-4 h-4 text-slate-400" />
+                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
                       映射
                     </div>
                   </TableHead>
-                  <TableHead className="font-semibold text-slate-700 h-12">
+                  <TableHead className="font-semibold text-foreground h-12">
                     <div className="flex items-center gap-2">
-                      <Cpu className="w-4 h-4 text-slate-400" />
+                      <Cpu className="w-4 h-4 text-muted-foreground" />
                       内部真实模型
                     </div>
                   </TableHead>
@@ -80,7 +77,7 @@ export default function ModelsPage() {
                   <TableRow>
                     <TableCell colSpan={3}>
                       <EmptyState
-                        icon={<List className="w-8 h-8 text-slate-400" />}
+                        icon={<List className="w-8 h-8 text-muted-foreground" />}
                         title="暂无模型配置"
                         description="管理员尚未配置任何模型映射"
                       />
@@ -90,10 +87,9 @@ export default function ModelsPage() {
                   models.map((m: any, i) => (
                     <motion.tr
                       key={i}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-slate-50"
+                      {...fadeInUp}
+                      transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
+                      className="border-b transition-colors hover:bg-accent/50"
                     >
                       <TableCell>
                         <Badge variant="outline" className="font-mono text-sm">
@@ -102,8 +98,8 @@ export default function ModelsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center">
-                          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center">
-                            <ArrowRight className="w-4 h-4 text-slate-400" />
+                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
+                            <ArrowRight className="w-4 h-4 text-muted-foreground" />
                           </div>
                         </div>
                       </TableCell>
@@ -123,15 +119,14 @@ export default function ModelsPage() {
 
       {/* Legend */}
       <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="text-xs text-slate-500 bg-slate-50 rounded-xl p-4"
+        {...fadeInUp}
+        transition={{ ...fadeInUp.transition, delay: 0.3 }}
+        className="text-xs text-muted-foreground bg-muted/50 rounded-xl p-4"
       >
-        <p className="font-medium text-slate-600 mb-2">说明：</p>
+        <p className="font-medium text-foreground mb-2">说明：</p>
         <ul className="space-y-1 list-disc list-inside">
-          <li><span className="text-blue-600">对外暴露模型</span>：客户端请求时使用的模型名称</li>
-          <li><span className="text-emerald-600">内部真实模型</span>：实际转发给后端的模型名称</li>
+          <li><span className="text-primary">对外暴露模型</span>：客户端请求时使用的模型名称</li>
+          <li><span className="text-success">内部真实模型</span>：实际转发给后端的模型名称</li>
         </ul>
       </motion.div>
     </div>
