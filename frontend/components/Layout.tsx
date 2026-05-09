@@ -44,6 +44,7 @@ function NavItem({ item, active }: { item: typeof NAV_ITEMS[0]; active: boolean 
     <li>
       <Link
         href={item.href}
+        prefetch={true}
         className={cn(
           "group flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 relative",
           active
