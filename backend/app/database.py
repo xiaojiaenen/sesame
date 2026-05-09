@@ -24,6 +24,7 @@ async def init_db():
             "ALTER TABLE users ADD COLUMN preferred_channel_id INTEGER",
             "ALTER TABLE users ADD COLUMN load_balance_enabled BOOLEAN NOT NULL DEFAULT 1",
             "ALTER TABLE request_logs ADD COLUMN internal_model VARCHAR(64)",
+            "ALTER TABLE api_keys ADD COLUMN key_encrypted TEXT",
         ]:
             try:
                 await conn.execute(__import__("sqlalchemy").text(stmt))

@@ -29,6 +29,8 @@ async def create_api_key(
     max_qpm: int,
     expire_days: int | None,
 ) -> tuple[str, ApiKey]:
+    from app.crypto import encrypt
+
     full_key, key_hash, key_prefix = generate_key()
     expire_at = None
     if expire_days:
@@ -36,6 +38,7 @@ async def create_api_key(
 
     api_key = ApiKey(
         key_hash=key_hash,
+        key_encrypted=encrypt(full_key),
         key_prefix=key_prefix,
         name=name,
         user_id=user_id,
@@ -114,6 +117,22 @@ async def validate_key(token: str) -> dict | None:
         return cached
 
     return None
+
+
+async def reveal_key(db: AsyncSession, key_id: int, user_id: str) -> str | None:
+    """解密并返回完整的 API Key（仅限 key 所有者）"""
+    from app.crypto import decrypt
+
+    result = await db.execute(
+        select(ApiKey).where(ApiKey.id == key_id, ApiKey.user_id == user_id)
+    )
+    key = result.scalar_one_or_none()
+    if not key or not key.key_encrypted:
+        return None
+    try:
+        return decrypt(key.key_encrypted)
+    except Exception:
+        return None
 
 
 async def update_last_used(db: AsyncSession, key_id: int):

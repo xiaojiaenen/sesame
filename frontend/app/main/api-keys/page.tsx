@@ -89,6 +89,21 @@ export default function ApiKeysPage() {
     toast.success("已复制到剪贴板");
   };
 
+  const [copyingKeyId, setCopyingKeyId] = useState<number | null>(null);
+
+  const handleCopyKey = async (keyId: number) => {
+    setCopyingKeyId(keyId);
+    try {
+      const res = await apiFetch(`/user/api-keys/${keyId}/reveal`);
+      await navigator.clipboard.writeText(res.api_key);
+      toast.success("API Key 已复制到剪贴板");
+    } catch (e: any) {
+      toast.error(e.message || "获取 Key 失败");
+    } finally {
+      setCopyingKeyId(null);
+    }
+  };
+
   const handleDelete = async (id: number) => {
     if (!confirm("确定要删除此 Key 吗？")) return;
     try {
@@ -242,16 +257,29 @@ export default function ApiKeysPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-2">
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopyKey(k.id)}
+                            disabled={copyingKeyId === k.id}
+                            className="text-slate-500 hover:text-foreground hover:bg-slate-100"
+                          >
+                            {copyingKeyId === k.id ? (
+                              <Check className="w-4 h-4" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => toggleActive(k.id, k.is_active)}
                             className={k.is_active ? "text-amber-600 hover:text-amber-700 hover:bg-amber-50" : "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"}
                           >
                             {k.is_active ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
                           </Button>
-                          <Button 
-                            variant="ghost" 
+                          <Button
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(k.id)}
                             className="text-red-500 hover:text-red-700 hover:bg-red-50"

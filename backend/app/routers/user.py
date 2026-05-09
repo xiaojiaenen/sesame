@@ -334,6 +334,19 @@ async def delete_key(
     return {"status": "deleted"}
 
 
+@router.get("/api-keys/{key_id}/reveal")
+async def reveal_key(
+    key_id: int,
+    auth: AuthUser = Depends(get_jwt_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取完整 API Key（仅限所有者）"""
+    full_key = await apikey_service.reveal_key(db, key_id, auth.user_id)
+    if not full_key:
+        raise HTTPException(status_code=404, detail="未找到 API Key 或无法解密")
+    return {"api_key": full_key}
+
+
 @router.get("/models", response_model=list[ModelMappingInfo])
 async def list_models():
     return await mapping_service.list_mappings()
