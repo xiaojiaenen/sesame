@@ -157,16 +157,14 @@ async def _proxy_request(request: Request, auth: AuthUser, backend_path: str):
         )
         await _log_request(auth.user_id, auth.key_id, external_model, False, 200, duration_ms, tokens_prompt, tokens_completion)
     else:
-        from fastapi.responses import StreamingResponse
+        # 替换 body_iterator 而非创建新 StreamingResponse，避免并发下 generator 被重复消费
         _stream_start = start
+        _orig_iter = result.body_iterator
 
-        tokens_prompt = 0
-        tokens_completion = 0
-
-        async def wrapped_stream(nonlocal_tokens_prompt=tokens_prompt, nonlocal_tokens_completion=tokens_completion):
+        async def wrapped_stream():
             tp = 0
             tc = 0
-            async for chunk in result.body_iterator:
+            async for chunk in _orig_iter:
                 yield chunk
                 line = chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
                 if line.startswith("data: ") and line.strip() != "data: [DONE]":
@@ -182,11 +180,7 @@ async def _proxy_request(request: Request, auth: AuthUser, backend_path: str):
             duration_ms = int((time.monotonic() - _stream_start) * 1000)
             await _log_request(auth.user_id, auth.key_id, external_model, True, 200, duration_ms, tp, tc)
 
-        result = StreamingResponse(
-            wrapped_stream(),
-            media_type=result.media_type,
-            headers=dict(result.headers),
-        )
+        result.body_iterator = wrapped_stream()
 
     import asyncio
     asyncio.create_task(session_service.update_last_used(auth.user_id))
