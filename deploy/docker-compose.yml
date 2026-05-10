@@ -1,36 +1,4 @@
 services:
-  mysql:
-    image: mysql:8.0
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-    volumes:
-      - mysql_data:/var/lib/mysql
-    ports:
-      - "3306:3306"
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass $REDIS_PASSWORD}
-    volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   backend:
     build:
       context: ..
@@ -41,19 +9,27 @@ services:
       ADMIN_USER: ${ADMIN_USER}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ENTERPRISE_AI_URL: ${ENTERPRISE_AI_URL}
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
+      MYSQL_HOST: ${MYSQL_HOST}
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_MODE: ${REDIS_MODE:-single}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-    depends_on:
-      mysql:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_PREFIX: ${REDIS_PREFIX:-sesame:}
+      REDIS_CLUSTER_NODES: ${REDIS_CLUSTER_NODES:-}
+      VALIDATE_COOKIE_ON_SUBMIT: ${VALIDATE_COOKIE_ON_SUBMIT:-false}
+      VALIDATE_COOKIE_URL: ${VALIDATE_COOKIE_URL:-}
+      DEFAULT_COOKIE_EXPIRE_DAYS: ${DEFAULT_COOKIE_EXPIRE_DAYS:-7}
+      SSO_LOGIN_URL: ${SSO_LOGIN_URL:-}
+      SSO_USERNAME_FIELD: ${SSO_USERNAME_FIELD:-username}
+      SSO_PASSWORD_FIELD: ${SSO_PASSWORD_FIELD:-password}
+      SSO_EXTRA_FIELDS: ${SSO_EXTRA_FIELDS:-}
+    ports:
+      - "8000:8000"
 
   frontend:
     build:
@@ -64,7 +40,3 @@ services:
       - "80:80"
     depends_on:
       - backend
-
-volumes:
-  mysql_data:
-  redis_data:
