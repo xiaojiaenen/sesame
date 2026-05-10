@@ -6,13 +6,10 @@ from app.database import get_db
 from app.models.schemas import (
     ModelMappingInfo,
     ModelMappingRequest,
-    ProxyRouteCreate,
-    ProxyRouteInfo,
-    ProxyRouteUpdate,
     UserCreate,
 )
 from app.services import apikey_service, auth_service, mapping_service, session_service
-from app.services import proxy_route_service, channel_service, log_service
+from app.services import channel_service, log_service
 from app.services.websocket_service import manager
 
 router = APIRouter(prefix="/admin")
@@ -168,73 +165,6 @@ async def delete_model_mapping(
     deleted = await mapping_service.delete_mapping(db, external_model)
     if not deleted:
         raise HTTPException(status_code=404, detail="映射不存在")
-    return {"status": "deleted"}
-
-
-# --- Proxy Routes ---
-
-@router.post("/proxy-routes", response_model=ProxyRouteInfo)
-async def create_proxy_route(
-    req: ProxyRouteCreate,
-    db: AsyncSession = Depends(get_db),
-    _: AuthUser = Depends(get_admin_user),
-):
-    route = await proxy_route_service.create_route(db, **req.model_dump())
-    return ProxyRouteInfo(
-        id=route.id,
-        path=route.path,
-        backend_path=route.backend_path,
-        method=route.method,
-        is_streamable=route.is_streamable,
-        is_enabled=route.is_enabled,
-        description=route.description,
-        created_at=route.created_at.isoformat() if route.created_at else None,
-    )
-
-
-@router.get("/proxy-routes", response_model=list[ProxyRouteInfo])
-async def list_proxy_routes(
-    db: AsyncSession = Depends(get_db),
-    _: AuthUser = Depends(get_admin_user),
-):
-    routes = await proxy_route_service.list_routes(db)
-    return [
-        ProxyRouteInfo(
-            id=r.id,
-            path=r.path,
-            backend_path=r.backend_path,
-            method=r.method,
-            is_streamable=r.is_streamable,
-            is_enabled=r.is_enabled,
-            description=r.description,
-            created_at=r.created_at.isoformat() if r.created_at else None,
-        )
-        for r in routes
-    ]
-
-
-@router.patch("/proxy-routes/{route_id}")
-async def update_proxy_route(
-    route_id: int,
-    req: ProxyRouteUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: AuthUser = Depends(get_admin_user),
-):
-    updated = await proxy_route_service.update_route(db, route_id, **req.model_dump(exclude_none=True))
-    if not updated:
-        raise HTTPException(status_code=404, detail="路由不存在")
-    return {"status": "ok"}
-
-
-@router.delete("/proxy-routes/{route_id}")
-async def delete_proxy_route(
-    route_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: AuthUser = Depends(get_admin_user),
-):
-    deleted = await proxy_route_service.delete_route(db, route_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="路由不存在")
     return {"status": "deleted"}
 
 

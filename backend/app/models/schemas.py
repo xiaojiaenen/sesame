@@ -150,31 +150,3 @@ class CookieInfo(BaseModel):
     cookie_preview: str  # Masked
 
 
-# --- Proxy Routes ---
-
-class ProxyRouteCreate(BaseModel):
-    path: str = Field(..., min_length=1, max_length=128)  # e.g. /v1/chat/completions
-    backend_path: str = Field(..., min_length=1, max_length=256)  # e.g. /v1/chat/completions
-    method: str = Field(default="POST", pattern="^(GET|POST|PUT|DELETE|PATCH)$")
-    is_streamable: bool = False
-    is_enabled: bool = True
-    description: str | None = None
-
-
-class ProxyRouteUpdate(BaseModel):
-    backend_path: str | None = None
-    method: str | None = None
-    is_streamable: bool | None = None
-    is_enabled: bool | None = None
-    description: str | None = None
-
-
-class ProxyRouteInfo(BaseModel):
-    id: int
-    path: str
-    backend_path: str
-    method: str
-    is_streamable: bool
-    is_enabled: bool
-    description: str | None
-    created_at: str | None

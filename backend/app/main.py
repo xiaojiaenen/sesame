@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 from contextlib import asynccontextmanager
 
@@ -12,7 +11,6 @@ from app.routers import admin, anthropic, chat, health, user
 from app.services.apikey_service import load_keys_to_cache
 from app.services.auth_service import create_user, get_user
 from app.services.mapping_service import load_mappings_to_cache
-from app.services.proxy_route_service import load_routes_to_cache
 from app.services.rate_limit_service import cleanup_old_records
 from app.services.channel_service import load_channels_to_cache
 
@@ -43,32 +41,14 @@ async def _init_admin():
             logger.info(f"Admin user already exists: {settings.admin_user}")
 
 
-async def _init_default_routes():
-    """Create default proxy routes from config."""
-    if not settings.default_routes:
-        return
-    try:
-        routes = json.loads(settings.default_routes)
-        from app.services.proxy_route_service import create_route, get_route
-        async with async_session() as db:
-            for r in routes:
-                existing = get_route(r["path"])
-                if not existing:
-                    await create_route(db, **r)
-                    logger.info(f"Created default route: {r['path']} -> {r['backend_path']}")
-    except Exception as e:
-        logger.warning(f"Failed to init default routes: {e}")
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
     await _init_admin()
-    await _init_default_routes()
     async with async_session() as db:
         await load_mappings_to_cache(db)
         await load_keys_to_cache(db)
-        await load_routes_to_cache(db)
         await load_channels_to_cache(db)
     task = asyncio.create_task(_periodic_cleanup())
     yield

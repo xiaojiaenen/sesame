@@ -232,26 +232,6 @@ async def validate_cookie(cookie: str) -> tuple[bool, str]:
         return True, "无法连接后端，已提交（使用时将验证）"
 
 
-async def proxy_raw(
-    cookie: str,
-    raw_body: bytes,
-    method: str,
-    backend_path: str,
-    stream: bool,
-) -> dict | StreamingResponse:
-    """Generic proxy without model replacement — for non-chat endpoints."""
-    client = await get_client()
-    url = f"{settings.enterprise_ai_url}{backend_path}"
-    headers = {
-        "Cookie": cookie,
-        "Content-Type": "application/json",
-    }
-
-    if stream:
-        return await _proxy_stream(client, url, headers, raw_body, "")
-    else:
-        return await _proxy_sync(client, url, headers, raw_body, "")
-
 
 def _check_backend_error(data: dict) -> None:
     """Check for backend-specific error codes in response body.

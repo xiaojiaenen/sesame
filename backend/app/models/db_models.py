@@ -104,18 +104,6 @@ class RateLimitLog(Base):
     )
 
 
-class ProxyRoute(Base):
-    __tablename__ = "proxy_routes"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    path: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)  # e.g. /v1/chat/completions
-    backend_path: Mapped[str] = mapped_column(String(256), nullable=False)  # e.g. /v1/chat/completions
-    method: Mapped[str] = mapped_column(String(10), default="POST")
-    is_streamable: Mapped[bool] = mapped_column(Boolean, default=False)
-    is_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    description: Mapped[str | None] = mapped_column(String(128))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=now_beijing)
-
 
 class Channel(Base):
     """多渠道支持 - 后端 API 渠道"""

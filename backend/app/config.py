@@ -11,8 +11,6 @@ class Settings(BaseSettings):
     # Auto-init admin user
     admin_user: str = "admin"
     admin_password: str = ""  # Must be set via env var
-    # Default proxy routes (JSON array, e.g. [{"path":"/v1/chat/completions","backend_path":"/agents/baitong/chat/completions","description":"Chat"}])
-    default_routes: str = ""
     # SSO auto-login config
     sso_login_url: str = ""  # e.g. https://sso.example.com/cas/login
     sso_username_field: str = "username"
