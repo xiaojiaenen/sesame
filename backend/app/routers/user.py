@@ -275,7 +275,6 @@ async def auto_login_channel(
         login_url=req.login_url,
         username=req.username,
         password=req.password,
-        login_type=req.login_type,
     )
     if not success:
         raise HTTPException(status_code=400, detail=msg)
@@ -300,7 +299,6 @@ async def auto_login_channel(
         existing.status = "active"
         existing.expire_at = expire_at
         existing.login_url = req.login_url
-        existing.login_type = req.login_type
         existing.username = req.username
         existing.password_encrypted = password_enc
         existing.auto_refresh = req.auto_refresh
@@ -313,7 +311,6 @@ async def auto_login_channel(
             status="active",
             expire_at=expire_at,
             login_url=req.login_url,
-            login_type=req.login_type,
             username=req.username,
             password_encrypted=password_enc,
             auto_refresh=req.auto_refresh,

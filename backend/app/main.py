@@ -58,7 +58,7 @@ async def _refresh_cookies_loop():
                     try:
                         pwd = decrypt(ucc.password_encrypted)
                         success, _, cookie = await login_with_credentials(
-                            ucc.login_url, ucc.username, pwd, ucc.login_type
+                            ucc.login_url, ucc.username, pwd
                         )
                         if success and cookie:
                             ucc.cookie_encrypted = encrypt(cookie)

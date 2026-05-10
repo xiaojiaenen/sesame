@@ -49,7 +49,6 @@ export default function ChannelsPage() {
   const [cookieDetail, setCookieDetail] = useState<any>(null);
   const [loginMode, setLoginMode] = useState<"manual" | "auto">("manual");
   const [loginUrl, setLoginUrl] = useState("");
-  const [loginType, setLoginType] = useState("api");
   const [loginUser, setLoginUser] = useState("");
   const [loginPass, setLoginPass] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -168,9 +167,7 @@ export default function ChannelsPage() {
       await apiFetch(`/user/channels/${dialogChannel.id}/cookie/auto-login`, {
         method: "POST",
         body: JSON.stringify({
-          channel_id: dialogChannel.id,
           login_url: loginUrl,
-          login_type: loginType,
           username: loginUser,
           password: loginPass,
           auto_refresh: autoRefresh,
@@ -517,33 +514,6 @@ export default function ChannelsPage() {
                     onChange={(e) => setLoginUrl(e.target.value)}
                     className="font-mono text-sm"
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label>登录方式</Label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setLoginType("api")}
-                      className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
-                        loginType === "api"
-                          ? "border-primary bg-primary/5 text-primary"
-                          : "border-border text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      API（JSON）
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLoginType("form")}
-                      className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
-                        loginType === "form"
-                          ? "border-primary bg-primary/5 text-primary"
-                          : "border-border text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      表单提交
-                    </button>
-                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">

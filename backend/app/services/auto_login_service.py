@@ -1,138 +1,118 @@
-"""自动登录服务 - 支持多种登录方式"""
+"""自动登录服务 - 基于 Playwright 浏览器自动化"""
 
-import json
-import httpx
+import asyncio
 from typing import Optional
 
-from app.config import settings
+from playwright.async_api import async_playwright
 
 
 async def login_with_credentials(
     login_url: str,
     username: str,
     password: str,
-    login_type: str = "form"
 ) -> tuple[bool, str, Optional[str]]:
     """
-    使用账号密码自动登录获取 Cookie
-
-    Args:
-        login_url: 登录接口 URL
-        username: 用户名
-        password: 密码
-        login_type: 登录类型 (form/api/oauth)
+    使用 Playwright 打开浏览器，自动填写账号密码登录，提取 Cookie。
 
     Returns:
-        (success, message, cookie)
+        (success, message, cookie_string)
     """
     try:
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            if login_type == "api":
-                return await _login_api(client, login_url, username, password)
-            elif login_type == "form":
-                return await _login_form(client, login_url, username, password)
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context()
+            page = await context.new_page()
+
+            await page.goto(login_url, wait_until="networkidle", timeout=30000)
+
+            # 自动识别用户名输入框
+            username_input = await _find_username_input(page)
+            if not username_input:
+                await browser.close()
+                return False, "未找到用户名输入框", None
+
+            # 自动识别密码输入框
+            password_input = await page.query_selector('input[type="password"]')
+            if not password_input:
+                await browser.close()
+                return False, "未找到密码输入框", None
+
+            # 填写表单
+            await username_input.fill(username)
+            await password_input.fill(password)
+
+            # 提交：优先找提交按钮，否则回车
+            submit_btn = await _find_submit_button(page)
+            if submit_btn:
+                await submit_btn.click()
             else:
-                return False, f"不支持的登录类型: {login_type}", None
+                await password_input.press("Enter")
+
+            # 等待导航完成
+            await page.wait_for_load_state("networkidle", timeout=15000)
+            await asyncio.sleep(1)  # 等待 JS 设置 cookie
+
+            # 提取所有 cookie
+            cookies = await context.cookies()
+            await browser.close()
+
+            if not cookies:
+                return False, "登录成功但未获取到 Cookie", None
+
+            cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in cookies)
+            return True, "登录成功", cookie_str
+
     except Exception as e:
         return False, f"登录失败: {str(e)}", None
 
 
-async def _login_api(
-    client: httpx.AsyncClient,
-    login_url: str,
-    username: str,
-    password: str
-) -> tuple[bool, str, Optional[str]]:
-    """API 方式登录"""
-    resp = await client.post(
-        login_url,
-        json={"username": username, "password": password},
-        headers={"Content-Type": "application/json"}
-    )
+async def _find_username_input(page):
+    """智能识别用户名输入框"""
+    # 优先级从高到低
+    selectors = [
+        'input[name="username"]',
+        'input[name="account"]',
+        'input[name="user"]',
+        'input[name="email"]',
+        'input[name="loginId"]',
+        'input[name="userId"]',
+        'input[type="email"]',
+        'input[type="text"][autocomplete="username"]',
+        'input[type="tel"]',
+    ]
+    for sel in selectors:
+        el = await page.query_selector(sel)
+        if el and await el.is_visible():
+            return el
 
-    if resp.status_code == 200:
-        # 从响应中提取 Cookie
-        cookies = resp.cookies
-        if cookies:
-            cookie_str = "; ".join([f"{k}={v}" for k, v in cookies.items()])
-            return True, "登录成功", cookie_str
+    # 兜底：密码框前面的第一个可见 text/email/tel input
+    password = await page.query_selector('input[type="password"]')
+    if password:
+        all_inputs = await page.query_selector_all(
+            'input[type="text"], input[type="email"], input[type="tel"], input:not([type])'
+        )
+        for inp in all_inputs:
+            if await inp.is_visible():
+                bbox = await inp.bounding_box()
+                pwd_box = await password.bounding_box()
+                if bbox and pwd_box and bbox["y"] < pwd_box["y"]:
+                    return inp
 
-        # 尝试从响应体中提取 token
-        try:
-            data = resp.json()
-            token = data.get("token") or data.get("access_token")
-            if token:
-                return True, "登录成功", f"Bearer {token}"
-        except Exception:
-            pass
-
-        return False, "登录成功但未获取到 Cookie", None
-    else:
-        return False, f"登录失败: HTTP {resp.status_code}", None
-
-
-async def _login_form(
-    client: httpx.AsyncClient,
-    login_url: str,
-    username: str,
-    password: str
-) -> tuple[bool, str, Optional[str]]:
-    """表单方式登录"""
-    # 先获取登录页面（可能需要 CSRF token）
-    page_resp = await client.get(login_url)
-
-    # 提取 CSRF token（如果有的话）
-    csrf_token = None
-    if "csrf" in page_resp.text.lower():
-        import re
-        match = re.search(r'name="csrf[_-]token"[^>]*value="([^"]*)"', page_resp.text)
-        if match:
-            csrf_token = match.group(1)
-
-    # 构建表单数据
-    form_data = {"username": username, "password": password}
-    if csrf_token:
-        form_data["csrf_token"] = csrf_token
-
-    # 提交登录表单
-    resp = await client.post(login_url, data=form_data)
-
-    if resp.status_code in (200, 302):
-        cookies = resp.cookies
-        if cookies:
-            cookie_str = "; ".join([f"{k}={v}" for k, v in cookies.items()])
-            return True, "登录成功", cookie_str
-
-    return False, f"登录失败: HTTP {resp.status_code}", None
+    return None
 
 
-async def refresh_cookie(
-    refresh_url: str,
-    current_cookie: str
-) -> tuple[bool, str, Optional[str]]:
-    """
-    刷新 Cookie
-
-    Args:
-        refresh_url: 刷新接口 URL
-        current_cookie: 当前 Cookie
-
-    Returns:
-        (success, message, new_cookie)
-    """
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.post(
-                refresh_url,
-                headers={"Cookie": current_cookie}
-            )
-
-            if resp.status_code == 200:
-                cookies = resp.cookies
-                if cookies:
-                    cookie_str = "; ".join([f"{k}={v}" for k, v in cookies.items()])
-                    return True, "刷新成功", cookie_str
-
-            return False, f"刷新失败: HTTP {resp.status_code}", None
-    except Exception as e:
-        return False, f"刷新失败: {str(e)}", None
+async def _find_submit_button(page):
+    """智能识别登录按钮"""
+    selectors = [
+        'button[type="submit"]',
+        'input[type="submit"]',
+        'button:has-text("登录")',
+        'button:has-text("Login")',
+        'button:has-text("Sign in")',
+        'button:has-text("提交")',
+    ]
+    for sel in selectors:
+        el = await page.query_selector(sel)
+        if el and await el.is_visible():
+            return el
+    return None
