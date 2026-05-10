@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fadeInUp } from "@/lib/animations";
@@ -203,7 +202,7 @@ export default function ChannelsPage() {
       {/* 负载均衡和渠道选择 */}
       <motion.div {...fadeInUp}>
         <Card className="ring-1 ring-border/40 shadow-xs">
-          <CardContent className="p-4 flex items-center gap-6">
+          <CardContent className="p-4 space-y-3">
             <div className="flex items-center gap-3">
               <Switch
                 checked={loadBalanceEnabled}
@@ -211,25 +210,54 @@ export default function ChannelsPage() {
               />
               <Label className="text-sm">负载均衡</Label>
               <span className="text-xs text-muted-foreground">
-                {loadBalanceEnabled ? "按权重自动分配" : "使用指定渠道"}
+                {loadBalanceEnabled ? "按权重自动分配请求" : "指定单一渠道"}
               </span>
             </div>
+            <p className="text-xs text-muted-foreground">
+              开启后系统会根据各渠道权重自动分配请求，实现流量负载均衡和故障转移。关闭后所有请求将发送到您指定的渠道。
+            </p>
             {!loadBalanceEnabled && (
-              <Select
-                value={preferredChannelId ? String(preferredChannelId) : ""}
-                onValueChange={(v) => { if (v) handleSelectChannel(Number(v)); }}
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="选择渠道" />
-                </SelectTrigger>
-                <SelectContent>
-                  {channels.filter(c => c.status === "active").map(c => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="pt-1">
+                <p className="text-xs font-medium text-foreground mb-2">选择渠道：</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {channels.filter(c => c.status === "active").map(c => {
+                    const isSelected = preferredChannelId === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => handleSelectChannel(c.id)}
+                        className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all duration-150 ${
+                          isSelected
+                            ? "border-primary ring-2 ring-primary/20 bg-primary/5"
+                            : "border-border/60 hover:border-border hover:bg-accent/50"
+                        }`}
+                      >
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          isSelected ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground"
+                        }`}>
+                          {c.auth_type === "cookie" ? (
+                            <Cookie className="w-4 h-4" />
+                          ) : (
+                            <Key className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-medium truncate ${isSelected ? "text-primary" : "text-foreground"}`}>
+                            {c.name}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground truncate">
+                            {c.base_url}
+                          </div>
+                        </div>
+                        {isSelected && (
+                          <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
