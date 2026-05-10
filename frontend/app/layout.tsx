@@ -19,8 +19,9 @@ const firaCode = Fira_Code({
 });
 
 export const metadata: Metadata = {
-  title: 'Sesame Gateway',
-  description: 'Enterprise AI Gateway Management',
+  title: 'Sesame - AI 网关',
+  description: '芝麻智门 · Enterprise AI Gateway',
+  icons: { icon: '/logo.svg', apple: '/logo.svg' },
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {

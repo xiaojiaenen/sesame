@@ -102,7 +102,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return <SidebarSkeleton />;
   }
 
-  const pageTitle = PAGE_TITLES[pathname.split("/").pop() || ""] || "Sesame";
+  const pageTitle = PAGE_TITLES[pathname.split("/").pop() || ""] || "芝麻智门";
 
   return (
     <div className="min-h-screen flex bg-background">
@@ -113,7 +113,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <img src="/logo.svg" alt="Sesame" className="w-7 h-7" />
           <div className="leading-none">
             <div className="font-bold text-sm text-foreground tracking-tight">Sesame</div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">Gateway</div>
+            <div className="text-[10px] text-muted-foreground mt-0.5">芝麻智门</div>
           </div>
         </div>
 

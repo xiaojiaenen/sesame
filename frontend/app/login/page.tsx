@@ -57,10 +57,10 @@ export default function LoginPage() {
               <img src="/logo.svg" alt="Sesame" className="w-12 h-12" />
             </div>
             <h1 className="text-2xl font-bold text-foreground tracking-tight">
-              Sesame Gateway
+              Sesame
             </h1>
             <p className="text-sm text-muted-foreground mt-1.5">
-              企业 AI 网关管理平台
+              芝麻智门 · AI 网关
             </p>
           </div>
 
@@ -143,7 +143,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground/60 mt-6">
-          Sesame Gateway v1.1.0
+          Sesame v1.1.0
         </p>
       </motion.div>
     </div>

@@ -1,6 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <rect width="32" height="32" rx="8" fill="#10b981"/>
-  <path d="M8 12C8 10.8954 8.89543 10 10 10H22C23.1046 10 24 10.8954 24 12V20C24 21.1046 23.1046 22 22 22H10C8.89543 22 8 21.1046 8 20V12Z" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-  <path d="M12 14H20M12 18H16" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
-  <circle cx="16" cy="7" r="2" fill="white"/>
+  <defs>
+    <linearGradient id="bg" x1="4" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A1429"/>
+      <stop offset="1" stop-color="#1E1830"/>
+    </linearGradient>
+    <linearGradient id="seed" x1="8" y1="8" x2="28" y2="24" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FBBF24"/>
+      <stop offset="0.5" stop-color="#F59E0B"/>
+      <stop offset="1" stop-color="#EA580C"/>
+    </linearGradient>
+    <linearGradient id="portal" x1="12" y1="6" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FDE68A"/>
+      <stop offset="1" stop-color="#FBBF24"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="32" height="32" rx="7.5" fill="url(#bg)"/>
+
+  <!-- Outer sesame seed shape -->
+  <ellipse cx="16.5" cy="17" rx="7.5" ry="11" fill="url(#seed)" transform="rotate(-12 16.5 17)"/>
+
+  <!-- Gateway portal arch (negative space) -->
+  <path d="M11 22 L11 16 Q11 9 16 9 Q21 9 21 16 L21 22" stroke="#1A1429" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Inner glow / key seed -->
+  <circle cx="16" cy="14.5" r="1.5" fill="url(#portal)"/>
 </svg>
