@@ -31,18 +31,22 @@ async def check_rate_limit(key_id: int, max_qpm: int) -> bool:
 
     Uses Redis sorted set for accurate sliding-window rate limiting.
     Atomic Lua script eliminates race conditions.
+    Works with both single-node and cluster Redis.
     """
-    cache = get_cache()
+    from app.config import settings
     r = await _get_redis()
     now = time.time()
     key = f"ratelimit:{key_id}"
+    # Cluster mode requires hash tag around key for Lua scripts
+    if settings.redis_mode == "cluster":
+        key = "{" + key + "}"
 
     result = await r.eval(
         LUA_CHECK_RATE,
         1,
         key,
         str(max_qpm),
-        "60",  # 60-second window
+        "60",
         str(now),
     )
     return result == 1

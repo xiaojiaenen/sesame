@@ -1,24 +1,48 @@
 import json
-import time
 from typing import Any
 
 from redis.asyncio import Redis as AsyncRedis
+from redis.asyncio.cluster import RedisCluster as AsyncRedisCluster
 
 from app.config import settings
 
-_redis: AsyncRedis | None = None
+_redis: AsyncRedis | AsyncRedisCluster | None = None
 
 
-async def get_redis() -> AsyncRedis:
+async def get_redis() -> AsyncRedis | AsyncRedisCluster:
     global _redis
     if _redis is None:
-        _redis = AsyncRedis.from_url(
-            settings.redis_url,
-            decode_responses=True,
-            socket_connect_timeout=5,
-            socket_keepalive=True,
-        )
+        if settings.redis_mode == "cluster":
+            nodes = _parse_cluster_nodes()
+            _redis = AsyncRedisCluster(
+                host=nodes[0][0], port=nodes[0][1],
+                password=settings.redis_password or None,
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_keepalive=True,
+            )
+        else:
+            _redis = AsyncRedis.from_url(
+                settings.redis_url,
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_keepalive=True,
+            )
     return _redis
+
+
+def _parse_cluster_nodes() -> list[tuple[str, int]]:
+    if settings.redis_cluster_nodes:
+        nodes = []
+        for item in settings.redis_cluster_nodes.split(","):
+            item = item.strip()
+            if ":" in item:
+                host, port = item.rsplit(":", 1)
+                nodes.append((host, int(port)))
+        if nodes:
+            return nodes
+    # Fallback to single host:port
+    return [(settings.redis_host, settings.redis_port)]
 
 
 async def close_redis():
@@ -29,13 +53,22 @@ async def close_redis():
 
 
 class CacheBackend:
-    """Redis-backed cache implementing the same interface as MemoryCache."""
+    """Redis cache — supports both single-node and cluster mode.
+
+    In cluster mode, key tags {_} are used to colocate related hash keys
+    on the same node.
+    """
 
     def __init__(self, prefix: str = ""):
         self.prefix = prefix or settings.redis_prefix
+        self._cluster = settings.redis_mode == "cluster"
 
     def _k(self, key: str) -> str:
-        return f"{self.prefix}{key}"
+        k = f"{self.prefix}{key}"
+        if self._cluster:
+            # Hash tag ensures keys with same {} land on same slot
+            return "{" + k + "}"
+        return k
 
     async def get(self, key: str) -> dict[str, Any] | None:
         r = await get_redis()
@@ -84,21 +117,27 @@ class CacheBackend:
     async def get_all_hash_keys(self) -> list[str]:
         r = await get_redis()
         prefix_len = len(self.prefix)
+        if self._cluster:
+            # Cluster mode: hash tag stripped from returned keys
+            tag_len = 2  # {}
+        else:
+            tag_len = 0
         keys = []
         cursor = 0
         while True:
             cursor, batch = await r.scan(cursor, match=f"{self.prefix}*", count=100)
             for k in batch:
+                # Strip hash tag wrapper if cluster mode
+                if self._cluster and k.startswith("{") and k.endswith("}"):
+                    k = k[1:-1]
                 keys.append(k[prefix_len:])
             if cursor == 0:
                 break
         return keys
 
     async def incr(self, key: str, ttl: int | None = None) -> int:
-        """Atomic increment, optionally set TTL on first call."""
         r = await get_redis()
         k = self._k(key)
-        # Lua script: INCR, set TTL only if key just created
         script = """
         local v = redis.call('INCR', KEYS[1])
         if v == 1 and ARGV[1] ~= '' then
@@ -110,7 +149,6 @@ class CacheBackend:
         return await r.eval(script, 1, k, ttl_str)
 
     async def set_nx(self, key: str, value: str, ttl: int | None = None) -> bool:
-        """SET NX — returns True if key was set, False if already existed."""
         r = await get_redis()
         k = self._k(key)
         if ttl:

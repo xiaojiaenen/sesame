@@ -10,11 +10,13 @@ class Settings(BaseSettings):
     mysql_database: str = "sesame"
 
     # Redis
+    redis_mode: str = "single"  # single | cluster
     redis_host: str = "127.0.0.1"
     redis_port: int = 6379
     redis_password: str = ""
     redis_db: int = 0
     redis_prefix: str = "sesame:"
+    redis_cluster_nodes: str = ""  # cluster mode: "host1:6379,host2:6379,host3:6379"
 
     # Backend
     enterprise_ai_url: str = "https://agents.gree.com"
