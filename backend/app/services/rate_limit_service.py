@@ -1,55 +1,58 @@
+"""Rate limiting - Redis-based sliding window, atomic Lua script."""
+
 import time
 
-from sqlalchemy import delete, select
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.cache import get_cache
 
-from app.database import async_session
-from app.models.db_models import RateLimitLog
+LUA_CHECK_RATE = """
+local key = KEYS[1]
+local max_qpm = tonumber(ARGV[1])
+local window_sec = tonumber(ARGV[2])
+local now = tonumber(ARGV[3])
+
+-- Remove expired entries
+redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window_sec)
+
+-- Count current requests in window
+local current = redis.call('ZCARD', key)
+if current >= max_qpm then
+    return 0
+end
+
+-- Add current request with unique score
+redis.call('ZADD', key, now, now .. '-' .. current)
+redis.call('EXPIRE', key, window_sec + 1)
+return 1
+"""
 
 
 async def check_rate_limit(key_id: int, max_qpm: int) -> bool:
-    """Returns True if request is allowed, False if rate limited."""
-    minute_ts = int(time.time()) // 60
+    """Returns True if request is allowed.
 
-    async with async_session() as db:
-        # Use INSERT OR UPDATE to avoid race condition
-        result = await db.execute(
-            select(RateLimitLog).where(
-                RateLimitLog.key_id == key_id,
-                RateLimitLog.minute_ts == minute_ts,
-            )
-        )
-        log = result.scalar_one_or_none()
+    Uses Redis sorted set for accurate sliding-window rate limiting.
+    Atomic Lua script eliminates race conditions.
+    """
+    cache = get_cache()
+    r = await _get_redis()
+    now = time.time()
+    key = f"ratelimit:{key_id}"
 
-        if log is None:
-            try:
-                db.add(RateLimitLog(key_id=key_id, minute_ts=minute_ts, request_count=1))
-                await db.commit()
-                return True
-            except Exception:
-                # Concurrent insert happened, re-check
-                await db.rollback()
-                result = await db.execute(
-                    select(RateLimitLog).where(
-                        RateLimitLog.key_id == key_id,
-                        RateLimitLog.minute_ts == minute_ts,
-                    )
-                )
-                log = result.scalar_one_or_none()
-                if log is None:
-                    return True  # Shouldn't happen, but allow if it does
-
-        if log.request_count >= max_qpm:
-            return False
-
-        log.request_count += 1
-        await db.commit()
-        return True
+    result = await r.eval(
+        LUA_CHECK_RATE,
+        1,
+        key,
+        str(max_qpm),
+        "60",  # 60-second window
+        str(now),
+    )
+    return result == 1
 
 
-async def cleanup_old_records(db: AsyncSession):
-    """Delete rate limit records older than 5 minutes."""
-    cutoff = int(time.time()) // 60 - 5
-    await db.execute(delete(RateLimitLog).where(RateLimitLog.minute_ts < cutoff))
-    await db.commit()
+async def cleanup_old_records():
+    """No-op with Redis — expired keys are auto-deleted via EXPIRE."""
+    pass
+
+
+async def _get_redis():
+    from app.cache import get_redis
+    return await get_redis()

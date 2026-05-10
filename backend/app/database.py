@@ -4,7 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.config import settings
 
-engine = create_async_engine(settings.database_url, echo=False)
+engine = create_async_engine(
+    settings.db_url,
+    echo=False,
+    pool_size=20,
+    max_overflow=40,
+    pool_recycle=3600,
+    pool_pre_ping=True,
+)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
@@ -14,19 +21,7 @@ async def get_db() -> AsyncGenerator[AsyncSession]:
 
 
 async def init_db():
-    from app.models.db_models import Base  # noqa: F811
+    from app.models.db_models import Base
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # 迁移：为已有表添加新列（create_all 不会修改已有表）
-        for stmt in [
-            "ALTER TABLE channels ADD COLUMN auth_type VARCHAR(10) NOT NULL DEFAULT 'api_key'",
-            "ALTER TABLE users ADD COLUMN preferred_channel_id INTEGER",
-            "ALTER TABLE users ADD COLUMN load_balance_enabled BOOLEAN NOT NULL DEFAULT 1",
-            "ALTER TABLE request_logs ADD COLUMN internal_model VARCHAR(64)",
-            "ALTER TABLE api_keys ADD COLUMN key_encrypted TEXT",
-        ]:
-            try:
-                await conn.execute(__import__("sqlalchemy").text(stmt))
-            except Exception:
-                pass

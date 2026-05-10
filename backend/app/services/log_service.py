@@ -1,12 +1,10 @@
 """日志服务 - 记录 API 调用日志和统计"""
 
-import json
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import async_session
 from app.models.db_models import RequestLog, UsageStats
 from app.utils import now_beijing
 
@@ -24,8 +22,8 @@ async def log_request(
     status_code: int | None = None,
     is_stream: bool = False,
     error_message: str | None = None,
-) -> RequestLog:
-    """记录请求日志"""
+) -> None:
+    """记录请求日志并使用原子 SQL 更新用量统计"""
     log = RequestLog(
         user_id=user_id,
         key_id=key_id,
@@ -40,21 +38,18 @@ async def log_request(
         error_message=error_message,
     )
     db.add(log)
-    await db.commit()
-    await db.refresh(log)
+    await db.flush()
 
-    # 更新用量统计
-    await _update_usage_stats(
-        db, user_id, key_id, model,
+    await _upsert_usage_atomic(
+        db, user_id, key_id or 0, model,
         tokens_prompt + tokens_completion,
         tokens_prompt, tokens_completion,
         latency_ms, status_code
     )
+    await db.commit()
 
-    return log
 
-
-async def _update_usage_stats(
+async def _upsert_usage_atomic(
     db: AsyncSession,
     user_id: str,
     key_id: int | None,
@@ -65,49 +60,37 @@ async def _update_usage_stats(
     latency_ms: int | None,
     status_code: int | None,
 ):
-    """更新用量统计"""
+    """使用 MySQL INSERT ... ON DUPLICATE KEY UPDATE 原子 upsert"""
     today = now_beijing().strftime("%Y-%m-%d")
+    is_error = 1 if status_code and status_code >= 400 else 0
 
-    # 查找或创建统计记录
-    result = await db.execute(
-        select(UsageStats).where(
-            and_(
-                UsageStats.user_id == user_id,
-                UsageStats.key_id == key_id,
-                UsageStats.model == model,
-                UsageStats.date == today,
-            )
-        )
-    )
-    stats = result.scalar_one_or_none()
+    sql = text("""
+        INSERT INTO usage_stats
+            (user_id, key_id, model, date, total_requests, total_tokens,
+             total_prompt_tokens, total_completion_tokens, avg_latency_ms, error_count)
+        VALUES
+            (:user_id, :key_id, :model, :date, 1, :total_tokens,
+             :prompt_tokens, :completion_tokens, :latency_ms, :error_count)
+        ON DUPLICATE KEY UPDATE
+            total_requests = total_requests + 1,
+            total_tokens = total_tokens + :total_tokens,
+            total_prompt_tokens = total_prompt_tokens + :prompt_tokens,
+            total_completion_tokens = total_completion_tokens + :completion_tokens,
+            avg_latency_ms = (avg_latency_ms * total_requests + :latency_ms) / (total_requests + 1),
+            error_count = error_count + :error_count
+    """)
 
-    if stats:
-        # 更新现有记录
-        stats.total_requests += 1
-        stats.total_tokens += total_tokens
-        stats.total_prompt_tokens += prompt_tokens
-        stats.total_completion_tokens += completion_tokens
-        if latency_ms:
-            stats.avg_latency_ms = (stats.avg_latency_ms * (stats.total_requests - 1) + latency_ms) / stats.total_requests
-        if status_code and status_code >= 400:
-            stats.error_count += 1
-    else:
-        # 创建新记录
-        stats = UsageStats(
-            user_id=user_id,
-            key_id=key_id,
-            model=model,
-            date=today,
-            total_requests=1,
-            total_tokens=total_tokens,
-            total_prompt_tokens=prompt_tokens,
-            total_completion_tokens=completion_tokens,
-            avg_latency_ms=latency_ms or 0,
-            error_count=1 if status_code and status_code >= 400 else 0,
-        )
-        db.add(stats)
-
-    await db.commit()
+    await db.execute(sql, {
+        "user_id": user_id,
+        "key_id": key_id,
+        "model": model,
+        "date": today,
+        "total_tokens": total_tokens,
+        "prompt_tokens": prompt_tokens,
+        "completion_tokens": completion_tokens,
+        "latency_ms": latency_ms or 0,
+        "error_count": is_error,
+    })
 
 
 async def get_logs(
@@ -119,7 +102,6 @@ async def get_logs(
     limit: int = 100,
     offset: int = 0,
 ) -> list[RequestLog]:
-    """获取请求日志"""
     query = select(RequestLog).order_by(RequestLog.created_at.desc())
 
     if user_id:
@@ -143,7 +125,6 @@ async def get_logs_count(
     start_date: str | None = None,
     end_date: str | None = None,
 ) -> int:
-    """获取日志总数"""
     query = select(func.count(RequestLog.id))
 
     if user_id:
@@ -159,31 +140,7 @@ async def get_logs_count(
     return result.scalar() or 0
 
 
-async def get_usage_stats(
-    db: AsyncSession,
-    user_id: str | None = None,
-    model: str | None = None,
-    start_date: str | None = None,
-    end_date: str | None = None,
-) -> list[UsageStats]:
-    """获取用量统计"""
-    query = select(UsageStats).order_by(UsageStats.date.desc())
-
-    if user_id:
-        query = query.where(UsageStats.user_id == user_id)
-    if model:
-        query = query.where(UsageStats.model == model)
-    if start_date:
-        query = query.where(UsageStats.date >= start_date)
-    if end_date:
-        query = query.where(UsageStats.date <= end_date)
-
-    result = await db.execute(query)
-    return result.scalars().all()
-
-
 async def get_daily_stats(db: AsyncSession, days: int = 30) -> list[dict]:
-    """获取每日统计"""
     start_date = (now_beijing() - timedelta(days=days)).strftime("%Y-%m-%d")
 
     result = await db.execute(
@@ -217,7 +174,6 @@ async def get_daily_stats(db: AsyncSession, days: int = 30) -> list[dict]:
 
 
 async def get_model_stats(db: AsyncSession, days: int = 30) -> list[dict]:
-    """获取按模型统计"""
     start_date = (now_beijing() - timedelta(days=days)).strftime("%Y-%m-%d")
 
     result = await db.execute(
@@ -245,7 +201,6 @@ async def get_model_stats(db: AsyncSession, days: int = 30) -> list[dict]:
 
 
 async def get_user_stats(db: AsyncSession, days: int = 30) -> list[dict]:
-    """获取按用户统计"""
     start_date = (now_beijing() - timedelta(days=days)).strftime("%Y-%m-%d")
 
     result = await db.execute(

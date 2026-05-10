@@ -1,15 +1,16 @@
 import hashlib
+import json
 import secrets
-import time
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache import get_cache
 from app.models.db_models import ApiKey
 
 PREFIX = "sk-sesame-"
-KEY_CACHE: dict[str, dict] = {}  # key_hash -> {key_id, user_id, allowed_models, max_qpm, expire_ts}
+KEY_HASH_PREFIX = "apikey:"
 
 
 def generate_key() -> tuple[str, str, str]:
@@ -51,7 +52,7 @@ async def create_api_key(
     await db.commit()
     await db.refresh(api_key)
 
-    _cache_key(api_key)
+    await _cache_key(api_key)
     return full_key, api_key
 
 
@@ -68,6 +69,7 @@ async def get_all_keys(db: AsyncSession, limit: int | None = None, offset: int =
         q = q.limit(limit)
     result = await db.execute(q)
     return list(result.scalars().all())
+
 
 async def count_all_keys(db: AsyncSession) -> int:
     from sqlalchemy import func
@@ -86,7 +88,7 @@ async def update_api_key(db: AsyncSession, key_id: int, user_id: str | None, **k
         values["allowed_models"] = ",".join(values["allowed_models"])
     await db.execute(q.values(**values))
     await db.commit()
-    _invalidate_cache(key_id)
+    await _invalidate_cache(key_id)
     return True
 
 
@@ -100,27 +102,27 @@ async def delete_api_key(db: AsyncSession, key_id: int, user_id: str | None) -> 
         return False
     await db.delete(key)
     await db.commit()
-    _invalidate_cache(key_id)
+    await _invalidate_cache(key_id)
     return True
 
 
 async def validate_key(token: str) -> dict | None:
-    """Validate API key token, returns {key_id, user_id, allowed_models, max_qpm} or None."""
+    """Validate API key token from Redis cache."""
     key_hash = hashlib.sha256(token.encode()).hexdigest()
+    cache = get_cache()
 
-    # Check cache
-    cached = KEY_CACHE.get(key_hash)
-    if cached:
-        if cached.get("expire_ts") and time.time() > cached["expire_ts"]:
-            KEY_CACHE.pop(key_hash, None)
-            return None
-        return cached
+    data = await cache.get(f"{KEY_HASH_PREFIX}{key_hash}")
+    if not data:
+        return None
 
-    return None
+    if data.get("expire_ts") and datetime.now(timezone.utc).timestamp() > data["expire_ts"]:
+        await cache.delete(f"{KEY_HASH_PREFIX}{key_hash}")
+        return None
+
+    return data
 
 
 async def reveal_key(db: AsyncSession, key_id: int, user_id: str) -> str | None:
-    """解密并返回完整的 API Key（仅限 key 所有者）"""
     from app.crypto import decrypt
 
     result = await db.execute(
@@ -136,7 +138,6 @@ async def reveal_key(db: AsyncSession, key_id: int, user_id: str) -> str | None:
 
 
 async def update_last_used(db: AsyncSession, key_id: int):
-    from datetime import datetime, timezone
     await db.execute(
         update(ApiKey).where(ApiKey.id == key_id).values(last_used_at=datetime.now(timezone.utc))
     )
@@ -148,37 +149,43 @@ async def disable_user_keys(db: AsyncSession, user_id: str):
         update(ApiKey).where(ApiKey.user_id == user_id, ApiKey.is_active == True).values(is_active=False)
     )
     await db.commit()
-    # Invalidate all cached keys for this user
-    to_remove = [k for k, v in KEY_CACHE.items() if v.get("user_id") == user_id]
-    for k in to_remove:
-        KEY_CACHE.pop(k, None)
+    # Invalidate cached keys for this user
+    cache = get_cache()
+    keys = await cache.get_all_hash_keys()
+    for k in keys:
+        if k.startswith(KEY_HASH_PREFIX):
+            data = await cache.get(k)
+            if data and data.get("user_id") == user_id:
+                await cache.delete(k)
 
 
 async def load_keys_to_cache(db: AsyncSession):
     result = await db.execute(select(ApiKey).where(ApiKey.is_active == True))
     for key in result.scalars().all():
-        _cache_key(key)
+        await _cache_key(key)
 
 
-def _cache_key(key: ApiKey):
-    expire_ts = None
-    if key.expire_at:
-        expire_ts = key.expire_at.timestamp()
+async def _cache_key(key: ApiKey):
+    cache = get_cache()
+    expire_ts = key.expire_at.timestamp() if key.expire_at else None
     models = key.allowed_models.split(",") if key.allowed_models else []
-    KEY_CACHE[key.key_hash] = {
+    data = {
         "key_id": key.id,
         "user_id": key.user_id,
         "allowed_models": models,
         "max_qpm": key.max_qpm,
         "expire_ts": expire_ts,
     }
+    await cache.set(f"{KEY_HASH_PREFIX}{key.key_hash}", data)
 
 
-def _invalidate_cache(key_id: int):
-    to_remove = None
-    for k, v in KEY_CACHE.items():
-        if v.get("key_id") == key_id:
-            to_remove = k
-            break
-    if to_remove:
-        KEY_CACHE.pop(to_remove, None)
+async def _invalidate_cache(key_id: int):
+    cache = get_cache()
+    # Find and delete by key_id inside cached data
+    keys = await cache.get_all_hash_keys()
+    for k in keys:
+        if k.startswith(KEY_HASH_PREFIX):
+            data = await cache.get(k)
+            if data and data.get("key_id") == key_id:
+                await cache.delete(k)
+                break

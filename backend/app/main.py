@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -11,24 +10,12 @@ from app.routers import admin, anthropic, chat, health, user
 from app.services.apikey_service import load_keys_to_cache
 from app.services.auth_service import create_user, get_user
 from app.services.mapping_service import load_mappings_to_cache
-from app.services.rate_limit_service import cleanup_old_records
 from app.services.channel_service import load_channels_to_cache
 
 logger = logging.getLogger("sesame")
 
 
-async def _periodic_cleanup():
-    while True:
-        await asyncio.sleep(300)
-        try:
-            async with async_session() as db:
-                await cleanup_old_records(db)
-        except Exception:
-            pass
-
-
 async def _init_admin():
-    """Create default admin user if not exists."""
     if not settings.admin_password:
         logger.warning("ADMIN_PASSWORD not set, skipping admin user creation")
         return
@@ -41,7 +28,6 @@ async def _init_admin():
             logger.info(f"Admin user already exists: {settings.admin_user}")
 
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
@@ -50,12 +36,12 @@ async def lifespan(app: FastAPI):
         await load_mappings_to_cache(db)
         await load_keys_to_cache(db)
         await load_channels_to_cache(db)
-    task = asyncio.create_task(_periodic_cleanup())
     yield
-    task.cancel()
-    # Cleanup httpx client
+    # Cleanup
     from app.services.proxy_service import close_client
+    from app.cache import close_redis
     await close_client()
+    await close_redis()
 
 
 app = FastAPI(

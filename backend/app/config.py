@@ -2,21 +2,51 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    # MySQL
+    mysql_host: str = "127.0.0.1"
+    mysql_port: int = 3306
+    mysql_user: str = "sesame"
+    mysql_password: str = ""
+    mysql_database: str = "sesame"
+
+    # Redis
+    redis_host: str = "127.0.0.1"
+    redis_port: int = 6379
+    redis_password: str = ""
+    redis_db: int = 0
+    redis_prefix: str = "sesame:"
+
+    # Backend
     enterprise_ai_url: str = "https://agents.gree.com"
     encryption_key: str = ""
-    database_url: str = "sqlite+aiosqlite:///./data/sesame.db"
+    database_url: str = ""  # deprecated, use mysql_* above
     default_cookie_expire_days: int = 7
     validate_cookie_on_submit: bool = True
-    validate_cookie_url: str = ""  # Override URL for cookie validation, empty = use enterprise_ai_url
-    # Auto-init admin user
+    validate_cookie_url: str = ""
+
+    # Admin
     admin_user: str = "admin"
-    admin_password: str = ""  # Must be set via env var
-    # SSO auto-login config
-    sso_login_url: str = ""  # e.g. https://sso.example.com/cas/login
+    admin_password: str = ""
+
+    # SSO
+    sso_login_url: str = ""
     sso_username_field: str = "username"
     sso_password_field: str = "password"
-    sso_extra_fields: str = ""  # comma-separated key=value pairs
+    sso_extra_fields: str = ""
+
     version: str = "1.1.0"
+
+    @property
+    def db_url(self) -> str:
+        if self.database_url:
+            return self.database_url
+        pwd = f":{self.mysql_password}" if self.mysql_password else ""
+        return f"mysql+asyncmy://{self.mysql_user}{pwd}@{self.mysql_host}:{self.mysql_port}/{self.mysql_database}"
+
+    @property
+    def redis_url(self) -> str:
+        pwd = f":{self.redis_password}@" if self.redis_password else ""
+        return f"redis://{pwd}{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

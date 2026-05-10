@@ -6,7 +6,6 @@ from fastapi.responses import JSONResponse
 
 from app.auth import AuthUser, get_api_key_user
 from app.database import async_session
-from app.models.db_models import SessionLog
 from app.services import apikey_service, channel_service, proxy_service, rate_limit_service, session_service
 from app.services import log_service
 from app.services.websocket_service import broadcast_request_event
@@ -215,15 +214,6 @@ async def _log_request(user_id, key_id, external_model, stream, status_code, dur
                 status_code=status_code,
                 is_stream=stream,
             )
-            db.add(SessionLog(
-                user_id=user_id,
-                external_model=external_model,
-                model=internal_model,
-                stream=stream,
-                status_code=status_code,
-                duration_ms=duration_ms,
-            ))
-            await db.commit()
     except Exception as e:
         import logging
         logging.getLogger("sesame").error(f"Failed to log request: {e}")

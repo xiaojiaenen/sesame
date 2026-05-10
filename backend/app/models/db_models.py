@@ -91,18 +91,6 @@ class ApiKey(Base):
     )
 
 
-class RateLimitLog(Base):
-    __tablename__ = "rate_limit_log"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    key_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    minute_ts: Mapped[int] = mapped_column(Integer, nullable=False)
-    request_count: Mapped[int] = mapped_column(Integer, default=1)
-
-    __table_args__ = (
-        Index("ix_rate_limit_key_minute", "key_id", "minute_ts", unique=True),
-    )
-
 
 
 class Channel(Base):
@@ -200,4 +188,5 @@ class UsageStats(Base):
         Index("ix_usage_stats_user_date", "user_id", "date"),
         Index("ix_usage_stats_model_date", "model", "date"),
         Index("ix_usage_stats_key_date", "key_id", "date"),
+        Index("uq_usage_stats_daily", "user_id", "key_id", "model", "date", unique=True),
     )
