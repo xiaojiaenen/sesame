@@ -150,3 +150,12 @@ class CookieInfo(BaseModel):
     cookie_preview: str  # Masked
 
 
+class AutoLoginRequest(BaseModel):
+    channel_id: int
+    login_url: str
+    login_type: str = "api"  # api | form
+    username: str
+    password: str
+    auto_refresh: bool = False
+
+

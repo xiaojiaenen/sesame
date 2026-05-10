@@ -134,6 +134,14 @@ class UserChannelCookie(Base):
         Enum("active", "expired", name="ucc_status"), default="active"
     )
     expire_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # 自动登录凭证
+    login_url: Mapped[str | None] = mapped_column(String(512))
+    login_type: Mapped[str] = mapped_column(
+        Enum("form", "api", name="ucc_login_type"), default="api", server_default="api"
+    )
+    username: Mapped[str | None] = mapped_column(String(128))
+    password_encrypted: Mapped[str | None] = mapped_column(Text)
+    auto_refresh: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_beijing)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, onupdate=now_beijing)
 

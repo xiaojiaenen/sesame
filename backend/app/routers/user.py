@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +11,7 @@ from app.models.schemas import (
     ApiKeyCreated,
     ApiKeyResponse,
     ApiKeyUpdate,
+    AutoLoginRequest,
     CookieInfo,
     CookieSubmit,
     ModelMappingInfo,
@@ -16,7 +19,6 @@ from app.models.schemas import (
     UserInfo,
     UserLogin,
 )
-from datetime import datetime
 from sqlalchemy import select, and_
 from app.utils import now_beijing
 from app.models.db_models import UserChannelCookie
@@ -252,6 +254,73 @@ async def delete_channel_cookie(
     await db.delete(ucc)
     await db.commit()
     return {"status": "deleted"}
+
+
+@router.post("/channels/{channel_id}/cookie/auto-login")
+async def auto_login_channel(
+    channel_id: int,
+    req: AutoLoginRequest,
+    auth: AuthUser = Depends(get_jwt_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """使用账号密码自动获取 Cookie"""
+    from app.crypto import encrypt
+    from app.services.auto_login_service import login_with_credentials
+
+    channel = channel_service.get_channel(channel_id)
+    if not channel or channel.get("auth_type") != "cookie":
+        raise HTTPException(status_code=404, detail="渠道不存在或不是 Cookie 类型")
+
+    success, msg, cookie = await login_with_credentials(
+        login_url=req.login_url,
+        username=req.username,
+        password=req.password,
+        login_type=req.login_type,
+    )
+    if not success:
+        raise HTTPException(status_code=400, detail=msg)
+
+    # 保存 cookie + 登录凭证
+    expire_at = now_beijing() + timedelta(days=7)
+    encrypted = encrypt(cookie)
+    password_enc = encrypt(req.password)
+
+    result = await db.execute(
+        select(UserChannelCookie).where(
+            and_(
+                UserChannelCookie.user_id == auth.user_id,
+                UserChannelCookie.channel_id == channel_id,
+            )
+        )
+    )
+    existing = result.scalar_one_or_none()
+
+    if existing:
+        existing.cookie_encrypted = encrypted
+        existing.status = "active"
+        existing.expire_at = expire_at
+        existing.login_url = req.login_url
+        existing.login_type = req.login_type
+        existing.username = req.username
+        existing.password_encrypted = password_enc
+        existing.auto_refresh = req.auto_refresh
+        existing.updated_at = now_beijing()
+    else:
+        db.add(UserChannelCookie(
+            user_id=auth.user_id,
+            channel_id=channel_id,
+            cookie_encrypted=encrypted,
+            status="active",
+            expire_at=expire_at,
+            login_url=req.login_url,
+            login_type=req.login_type,
+            username=req.username,
+            password_encrypted=password_enc,
+            auto_refresh=req.auto_refresh,
+        ))
+
+    await db.commit()
+    return {"status": "ok", "message": msg}
 
 
 # --- API Key Management ---

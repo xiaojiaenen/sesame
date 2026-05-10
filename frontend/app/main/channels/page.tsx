@@ -47,6 +47,12 @@ export default function ChannelsPage() {
   const [expireDays, setExpireDays] = useState("7");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cookieDetail, setCookieDetail] = useState<any>(null);
+  const [loginMode, setLoginMode] = useState<"manual" | "auto">("manual");
+  const [loginUrl, setLoginUrl] = useState("");
+  const [loginType, setLoginType] = useState("api");
+  const [loginUser, setLoginUser] = useState("");
+  const [loginPass, setLoginPass] = useState("");
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
   // Delete dialog
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -146,6 +152,35 @@ export default function ChannelsPage() {
       fetchChannels();
     } catch (e: any) {
       toast.error(e.message || "提交失败");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAutoLogin = async () => {
+    if (!dialogChannel) return;
+    if (!loginUrl.trim() || !loginUser.trim() || !loginPass.trim()) {
+      toast.error("请填写完整的登录信息");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await apiFetch(`/user/channels/${dialogChannel.id}/cookie/auto-login`, {
+        method: "POST",
+        body: JSON.stringify({
+          channel_id: dialogChannel.id,
+          login_url: loginUrl,
+          login_type: loginType,
+          username: loginUser,
+          password: loginPass,
+          auto_refresh: autoRefresh,
+        }),
+      });
+      toast.success("自动登录成功，Cookie 已更新");
+      setDialogOpen(false);
+      fetchChannels();
+    } catch (e: any) {
+      toast.error(e.message || "自动登录失败");
     } finally {
       setIsSubmitting(false);
     }
@@ -408,43 +443,137 @@ export default function ChannelsPage() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label>Cookie 内容</Label>
-              <Textarea
-                placeholder="SESSION=xxx; cookie=xxx; ..."
-                rows={4}
-                value={cookieVal}
-                onChange={(e) => setCookieVal(e.target.value)}
-                className="font-mono text-sm resize-none"
-              />
+            {/* 模式切换 */}
+            <div className="flex gap-1 p-1 bg-muted rounded-lg">
+              <button
+                type="button"
+                onClick={() => setLoginMode("manual")}
+                className={`flex-1 text-sm py-2 rounded-md transition-colors ${
+                  loginMode === "manual"
+                    ? "bg-background text-foreground shadow-sm font-medium"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                手动输入
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoginMode("auto")}
+                className={`flex-1 text-sm py-2 rounded-md transition-colors ${
+                  loginMode === "auto"
+                    ? "bg-background text-foreground shadow-sm font-medium"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                自动登录
+              </button>
             </div>
 
-            <div className="space-y-2">
-              <Label>有效天数</Label>
-              <Input
-                type="number"
-                min="1"
-                max="365"
-                value={expireDays}
-                onChange={(e) => setExpireDays(e.target.value)}
-                className="w-32"
-              />
-            </div>
-
-            <Alert>
-              <Info className="h-4 w-4" />
-              <AlertDescription>
-                <div className="space-y-1">
-                  <p className="font-medium">如何获取 Cookie：</p>
-                  <ol className="list-decimal list-inside space-y-0.5 text-sm">
-                    <li>在浏览器中登录对应的网页服务</li>
-                    <li>按 F12 打开开发者工具</li>
-                    <li>切换到 Network 标签，刷新页面</li>
-                    <li>点击任意请求，复制 Headers 中的 Cookie</li>
-                  </ol>
+            {loginMode === "manual" ? (
+              <>
+                <div className="space-y-2">
+                  <Label>Cookie 内容</Label>
+                  <Textarea
+                    placeholder="SESSION=xxx; cookie=xxx; ..."
+                    rows={4}
+                    value={cookieVal}
+                    onChange={(e) => setCookieVal(e.target.value)}
+                    className="font-mono text-sm resize-none"
+                  />
                 </div>
-              </AlertDescription>
-            </Alert>
+                <div className="space-y-2">
+                  <Label>有效天数</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={expireDays}
+                    onChange={(e) => setExpireDays(e.target.value)}
+                    className="w-32"
+                  />
+                </div>
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    <div className="space-y-1">
+                      <p className="font-medium">如何获取 Cookie：</p>
+                      <ol className="list-decimal list-inside space-y-0.5 text-sm">
+                        <li>在浏览器中登录对应的网页服务</li>
+                        <li>按 F12 打开开发者工具</li>
+                        <li>切换到 Network 标签，刷新页面</li>
+                        <li>点击任意请求，复制 Headers 中的 Cookie</li>
+                      </ol>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              </>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>登录接口 URL</Label>
+                  <Input
+                    placeholder="https://example.com/api/login"
+                    value={loginUrl}
+                    onChange={(e) => setLoginUrl(e.target.value)}
+                    className="font-mono text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>登录方式</Label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setLoginType("api")}
+                      className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
+                        loginType === "api"
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      API（JSON）
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLoginType("form")}
+                      className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
+                        loginType === "form"
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      表单提交
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>用户名</Label>
+                    <Input
+                      placeholder="username"
+                      value={loginUser}
+                      onChange={(e) => setLoginUser(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>密码</Label>
+                    <Input
+                      type="password"
+                      placeholder="password"
+                      value={loginPass}
+                      onChange={(e) => setLoginPass(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={autoRefresh}
+                    onCheckedChange={setAutoRefresh}
+                  />
+                  <Label className="text-sm">自动续期</Label>
+                  <span className="text-xs text-muted-foreground">过期前自动重新登录</span>
+                </div>
+              </>
+            )}
           </div>
 
           <DialogFooter className="gap-2">
@@ -459,16 +588,24 @@ export default function ChannelsPage() {
               </Button>
             )}
             <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmitCookie} disabled={isSubmitting}>
+            <Button
+              onClick={loginMode === "manual" ? handleSubmitCookie : handleAutoLogin}
+              disabled={isSubmitting}
+            >
               {isSubmitting ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  提交中...
+                  {loginMode === "manual" ? "提交中..." : "登录中..."}
                 </div>
-              ) : (
+              ) : loginMode === "manual" ? (
                 <>
                   <Send className="w-4 h-4 mr-2" />
                   提交 Cookie
+                </>
+              ) : (
+                <>
+                  <Key className="w-4 h-4 mr-2" />
+                  自动登录
                 </>
               )}
             </Button>

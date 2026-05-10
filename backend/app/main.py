@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -28,6 +29,49 @@ async def _init_admin():
             logger.info(f"Admin user already exists: {settings.admin_user}")
 
 
+async def _refresh_cookies_loop():
+    """定时刷新即将过期的 Cookie（每 30 分钟检查一次）"""
+    while True:
+        await asyncio.sleep(1800)
+        try:
+            from app.models.db_models import UserChannelCookie
+            from sqlalchemy import select, and_
+            from datetime import timedelta
+            from app.utils import now_beijing
+            from app.crypto import encrypt, decrypt
+            from app.services.auto_login_service import login_with_credentials
+
+            async with async_session() as db:
+                threshold = now_beijing() + timedelta(hours=6)
+                rows = await db.execute(
+                    select(UserChannelCookie).where(
+                        and_(
+                            UserChannelCookie.auto_refresh == True,
+                            UserChannelCookie.status == "active",
+                            UserChannelCookie.expire_at != None,
+                            UserChannelCookie.expire_at < threshold,
+                            UserChannelCookie.login_url != None,
+                        )
+                    )
+                )
+                for ucc in rows.scalars().all():
+                    try:
+                        pwd = decrypt(ucc.password_encrypted)
+                        success, _, cookie = await login_with_credentials(
+                            ucc.login_url, ucc.username, pwd, ucc.login_type
+                        )
+                        if success and cookie:
+                            ucc.cookie_encrypted = encrypt(cookie)
+                            ucc.expire_at = now_beijing() + timedelta(days=7)
+                            ucc.updated_at = now_beijing()
+                            await db.commit()
+                            logger.info(f"Auto-refreshed cookie for user={ucc.user_id} channel={ucc.channel_id}")
+                    except Exception as e:
+                        logger.warning(f"Cookie refresh failed user={ucc.user_id}: {e}")
+        except Exception as e:
+            logger.warning(f"Cookie refresh loop error: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
@@ -36,8 +80,9 @@ async def lifespan(app: FastAPI):
         await load_mappings_to_cache(db)
         await load_keys_to_cache(db)
         await load_channels_to_cache(db)
+    refresh_task = asyncio.create_task(_refresh_cookies_loop())
     yield
-    # Cleanup
+    refresh_task.cancel()
     from app.services.proxy_service import close_client
     from app.cache import close_redis
     await close_client()

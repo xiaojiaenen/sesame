@@ -22,6 +22,20 @@ async def get_db() -> AsyncGenerator[AsyncSession]:
 
 async def init_db():
     from app.models.db_models import Base
+    from sqlalchemy import text
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # v1.2 新增列迁移
+        cols = [
+            ("user_channel_cookies", "login_url", "VARCHAR(512) DEFAULT NULL"),
+            ("user_channel_cookies", "login_type", "VARCHAR(10) NOT NULL DEFAULT 'api'"),
+            ("user_channel_cookies", "username", "VARCHAR(128) DEFAULT NULL"),
+            ("user_channel_cookies", "password_encrypted", "TEXT DEFAULT NULL"),
+            ("user_channel_cookies", "auto_refresh", "TINYINT(1) NOT NULL DEFAULT 0"),
+        ]
+        for table, col, dtype in cols:
+            try:
+                await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col}"))
+            except Exception:
+                pass  # 列已存在
