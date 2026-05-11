@@ -5,7 +5,6 @@ interface UserInfo {
   user_id: string;
   role: "admin" | "user";
   is_active: boolean;
-  session_status: string;
 }
 
 interface AuthContextType {
@@ -31,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (storedToken) {
         setToken(storedToken);
         try {
-          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/user/profile`, {
+          const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/user/profile`, {
             headers: {
               Authorization: `Bearer ${storedToken}`,
             },
@@ -65,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("sesame_token", newToken);
     setToken(newToken);
     // Profile will be fetched on next render or we can fetch it immediately
-    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/user/profile`, {
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/user/profile`, {
       headers: {
         Authorization: `Bearer ${newToken}`,
       },

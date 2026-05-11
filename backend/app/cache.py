@@ -71,93 +71,129 @@ class CacheBackend:
         return k
 
     async def get(self, key: str) -> dict[str, Any] | None:
-        r = await get_redis()
-        data = await r.get(self._k(key))
-        if data:
-            return json.loads(data)
+        try:
+            r = await get_redis()
+            data = await r.get(self._k(key))
+            if data:
+                return json.loads(data)
+        except Exception:
+            pass
         return None
 
     async def set(self, key: str, value: dict[str, Any], ttl: int | None = None) -> None:
-        r = await get_redis()
-        k = self._k(key)
-        v = json.dumps(value, ensure_ascii=False)
-        if ttl:
-            await r.setex(k, ttl, v)
-        else:
-            await r.set(k, v)
+        try:
+            r = await get_redis()
+            k = self._k(key)
+            v = json.dumps(value, ensure_ascii=False)
+            if ttl:
+                await r.setex(k, ttl, v)
+            else:
+                await r.set(k, v)
+        except Exception:
+            pass
 
     async def delete(self, key: str) -> None:
-        r = await get_redis()
-        await r.delete(self._k(key))
+        try:
+            r = await get_redis()
+            await r.delete(self._k(key))
+        except Exception:
+            pass
 
     async def hash_get(self, key: str, field: str) -> str | None:
-        r = await get_redis()
-        return await r.hget(self._k(key), field)
+        try:
+            r = await get_redis()
+            return await r.hget(self._k(key), field)
+        except Exception:
+            return None
 
     async def hash_set(self, key: str, field: str, value: str) -> None:
-        r = await get_redis()
-        await r.hset(self._k(key), field, value)
+        try:
+            r = await get_redis()
+            await r.hset(self._k(key), field, value)
+        except Exception:
+            pass
 
     async def hash_get_all(self, key: str) -> dict[str, str]:
-        r = await get_redis()
-        return await r.hgetall(self._k(key))
+        try:
+            r = await get_redis()
+            return await r.hgetall(self._k(key))
+        except Exception:
+            return {}
 
     async def hash_delete(self, key: str, field: str) -> None:
-        r = await get_redis()
-        await r.hdel(self._k(key), field)
+        try:
+            r = await get_redis()
+            await r.hdel(self._k(key), field)
+        except Exception:
+            pass
 
     async def hash_exists(self, key: str, field: str) -> bool:
-        r = await get_redis()
-        return await r.hexists(self._k(key), field)
+        try:
+            r = await get_redis()
+            return await r.hexists(self._k(key), field)
+        except Exception:
+            return False
 
     async def hash_incrby(self, key: str, field: str, amount: int = 1) -> int:
-        r = await get_redis()
-        return await r.hincrby(self._k(key), field, amount)
+        try:
+            r = await get_redis()
+            return await r.hincrby(self._k(key), field, amount)
+        except Exception:
+            return 0
 
     async def get_all_hash_keys(self) -> list[str]:
         r = await get_redis()
         prefix_len = len(self.prefix)
-        if self._cluster:
-            # Cluster mode: hash tag stripped from returned keys
-            tag_len = 2  # {}
-        else:
-            tag_len = 0
         keys = []
-        cursor = 0
-        while True:
-            cursor, batch = await r.scan(cursor, match=f"{self.prefix}*", count=100)
-            for k in batch:
-                # Strip hash tag wrapper if cluster mode
-                if self._cluster and k.startswith("{") and k.endswith("}"):
-                    k = k[1:-1]
-                keys.append(k[prefix_len:])
-            if cursor == 0:
-                break
+        try:
+            cursor = 0
+            while True:
+                cursor, batch = await r.scan(cursor, match=f"{self.prefix}*", count=100)
+                for k in batch:
+                    if isinstance(k, bytes):
+                        k = k.decode()
+                    if self._cluster and k.startswith("{") and k.endswith("}"):
+                        k = k[1:-1]
+                    keys.append(k[prefix_len:])
+                if cursor == 0:
+                    break
+        except Exception:
+            # Cluster mode fallback: scan not supported, return empty
+            pass
         return keys
 
     async def incr(self, key: str, ttl: int | None = None) -> int:
-        r = await get_redis()
-        k = self._k(key)
-        script = """
-        local v = redis.call('INCR', KEYS[1])
-        if v == 1 and ARGV[1] ~= '' then
-            redis.call('EXPIRE', KEYS[1], ARGV[1])
-        end
-        return v
-        """
-        ttl_str = str(ttl) if ttl else ""
-        return await r.eval(script, 1, k, ttl_str)
+        try:
+            r = await get_redis()
+            k = self._k(key)
+            script = """
+            local v = redis.call('INCR', KEYS[1])
+            if v == 1 and ARGV[1] ~= '' then
+                redis.call('EXPIRE', KEYS[1], ARGV[1])
+            end
+            return v
+            """
+            ttl_str = str(ttl) if ttl else ""
+            return await r.eval(script, 1, k, ttl_str)
+        except Exception:
+            return 0
 
     async def set_nx(self, key: str, value: str, ttl: int | None = None) -> bool:
-        r = await get_redis()
-        k = self._k(key)
-        if ttl:
-            return await r.set(k, value, nx=True, ex=ttl)
-        return await r.set(k, value, nx=True)
+        try:
+            r = await get_redis()
+            k = self._k(key)
+            if ttl:
+                return await r.set(k, value, nx=True, ex=ttl)
+            return await r.set(k, value, nx=True)
+        except Exception:
+            return False
 
     async def key_exists(self, key: str) -> bool:
-        r = await get_redis()
-        return await r.exists(self._k(key)) > 0
+        try:
+            r = await get_redis()
+            return await r.exists(self._k(key)) > 0
+        except Exception:
+            return False
 
 
 # Global cache instance

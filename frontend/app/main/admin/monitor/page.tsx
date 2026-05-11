@@ -42,7 +42,7 @@ export default function MonitorPage() {
       wsRef.current = null;
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
     const wsUrl = apiUrl.replace(/^http/, 'ws') + '/admin/ws/monitor';
 
     try {

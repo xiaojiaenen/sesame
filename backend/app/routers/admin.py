@@ -8,7 +8,7 @@ from app.models.schemas import (
     ModelMappingRequest,
     UserCreate,
 )
-from app.services import apikey_service, auth_service, mapping_service, session_service
+from app.services import apikey_service, auth_service, mapping_service
 from app.services import channel_service, log_service
 from app.services.websocket_service import manager
 
@@ -106,36 +106,6 @@ async def force_delete_key(
     if not deleted:
         raise HTTPException(status_code=404, detail="API Key 不存在")
     return {"status": "deleted", "key_id": key_id}
-
-
-# --- Sessions ---
-
-@router.get("/sessions")
-async def list_sessions(_: AuthUser = Depends(get_admin_user)):
-    return await session_service.list_sessions()
-
-
-@router.get("/sessions/{user_id}")
-async def get_session_detail(
-    user_id: str,
-    _: AuthUser = Depends(get_admin_user),
-):
-    detail = await session_service.get_session_detail(user_id)
-    if not detail:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return detail
-
-
-@router.delete("/sessions/{user_id}")
-async def delete_session(
-    user_id: str,
-    db: AsyncSession = Depends(get_db),
-    _: AuthUser = Depends(get_admin_user),
-):
-    deleted = await session_service.delete_session(db, user_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Session not found")
-    return {"status": "deleted", "user_id": user_id}
 
 
 # --- Model Mapping ---

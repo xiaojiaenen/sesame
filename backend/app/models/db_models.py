@@ -75,7 +75,7 @@ class ApiKey(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     key_hash: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     key_encrypted: Mapped[str | None] = mapped_column(Text)
-    key_prefix: Mapped[str] = mapped_column(String(12), nullable=False)
+    key_prefix: Mapped[str] = mapped_column(String(20), nullable=False)
     name: Mapped[str | None] = mapped_column(String(64))
     user_id: Mapped[str] = mapped_column(String(64), nullable=False)
     allowed_models: Mapped[str | None] = mapped_column(Text)

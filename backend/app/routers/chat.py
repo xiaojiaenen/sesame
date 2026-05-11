@@ -1,13 +1,15 @@
 import json
+import logging
 import time
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
+logger = logging.getLogger("sesame.chat")
+
 from app.auth import AuthUser, get_api_key_user
 from app.database import async_session
-from app.services import apikey_service, channel_service, proxy_service, rate_limit_service, session_service
-from app.services import log_service
+from app.services import apikey_service, channel_service, proxy_service, rate_limit_service, log_service
 from app.services.websocket_service import broadcast_request_event
 
 router = APIRouter()
@@ -31,10 +33,10 @@ async def proxy_endpoint(
             content={"error": {"message": f"未支持的接口: {full_path}", "type": "sesame_error"}},
         )
 
-    return await _proxy_request(request, auth, full_path)
+    return await _proxy_request(request, auth)
 
 
-async def _proxy_request(request: Request, auth: AuthUser, backend_path: str):
+async def _proxy_request(request: Request, auth: AuthUser):
     start = time.monotonic()
     proxy_service._last_backend_model.set("")
 
@@ -74,19 +76,15 @@ async def _proxy_request(request: Request, auth: AuthUser, backend_path: str):
             preferred_channel_id = user_row.preferred_channel_id
 
     # 检查是否有可用渠道
-    channel, _ = channel_service.select_channel(external_model)
+    channel, backend_model = channel_service.select_channel(external_model)
+    logger.info(f"[CHAT] model={external_model} user={auth.user_id} key_id={auth.key_id} selected_channel={channel['id'] if channel else None} backend_model={backend_model}")
     cookie = ""
 
-    if channel and channel.get("auth_type") != "cookie":
-        pass
-    else:
-        session = await session_service.get_session(auth.user_id)
-        if not session:
-            return JSONResponse(
-                status_code=503,
-                content={"error": {"message": "需要配置 Cookie 或有可用的 API 渠道", "type": "sesame_error"}},
-            )
-        cookie = await session_service.get_decrypted_cookie(auth.user_id) or ""
+    if not channel:
+        return JSONResponse(
+            status_code=503,
+            content={"error": {"message": "没有可用的 API 渠道，请先在管理后台创建渠道", "type": "sesame_error"}},
+        )
 
     # 广播请求开始事件
     await broadcast_request_event(
@@ -104,7 +102,6 @@ async def _proxy_request(request: Request, auth: AuthUser, backend_path: str):
                 raw_body=raw_body,
                 target_model=external_model,
                 stream=stream,
-                backend_path=backend_path,
                 user_id=auth.user_id,
                 channel_id=preferred_channel_id,
             )
@@ -114,24 +111,23 @@ async def _proxy_request(request: Request, auth: AuthUser, backend_path: str):
                 raw_body=raw_body,
                 target_model=external_model,
                 stream=stream,
-                backend_path=backend_path,
                 user_id=auth.user_id,
             )
     except proxy_service.BackendAuthError:
+        logger.warning(f"[CHAT] BackendAuthError from {url if 'url' in dir() else 'unknown'}")
         await broadcast_request_event(
             event_type="request_error",
             user_id=auth.user_id,
             model=external_model,
             status_code=401,
-            error_message="会话已过期",
+            error_message="认证失败",
         )
-        async with async_session() as db:
-            await session_service.delete_session(db, auth.user_id)
         return JSONResponse(
-            status_code=503,
-            content={"error": {"message": "会话已过期，请重新提交 Cookie", "type": "sesame_error"}},
+            status_code=401,
+            content={"error": {"message": "后端认证失败，请检查渠道配置", "type": "sesame_error"}},
         )
     except proxy_service.BackendError as e:
+        logger.error(f"[CHAT] BackendError: {e}")
         await broadcast_request_event(
             event_type="request_error",
             user_id=auth.user_id,
@@ -182,7 +178,6 @@ async def _proxy_request(request: Request, auth: AuthUser, backend_path: str):
         result.body_iterator = wrapped_stream()
 
     import asyncio
-    asyncio.create_task(session_service.update_last_used(auth.user_id))
     if auth.key_id:
         asyncio.create_task(_update_key_last_used(auth.key_id))
 

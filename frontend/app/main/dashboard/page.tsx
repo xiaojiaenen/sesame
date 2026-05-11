@@ -8,8 +8,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
-  Key, Users, Route, ArrowRight,
-  AlertTriangle, CheckCircle2, XCircle,
+  Key, Users, ArrowRight,
+  AlertTriangle,
   Server, Database, BookOpen, BarChart3, FileText, Activity
 } from "lucide-react";
 
@@ -52,7 +52,7 @@ function StatCard({ icon: Icon, label, value, loading, color = "primary", href }
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [cookieStatus, setCookieStatus] = useState<any>(null);
+  const [channelCount, setChannelCount] = useState<number | null>(null);
   const [apiKeyCount, setApiKeyCount] = useState<number | null>(null);
   const [adminStats, setAdminStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -60,22 +60,22 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [cookieRes, apiKeysRes] = await Promise.allSettled([
-          apiFetch("/user/cookie"),
+        const [channelsRes, apiKeysRes] = await Promise.allSettled([
+          apiFetch("/user/channels"),
           apiFetch("/user/api-keys")
         ]);
-        if (cookieRes.status === "fulfilled") setCookieStatus(cookieRes.value);
+        if (channelsRes.status === "fulfilled") setChannelCount(channelsRes.value.length);
         if (apiKeysRes.status === "fulfilled") setApiKeyCount(apiKeysRes.value.length);
 
         if (user?.role === "admin") {
-          const [usersRes, routesRes, healthRes] = await Promise.allSettled([
+          const [usersRes, channelsRes, healthRes] = await Promise.allSettled([
             apiFetch("/admin/users"),
-            apiFetch("/admin/proxy-routes"),
+            apiFetch("/admin/channels"),
             apiFetch("/health")
           ]);
           setAdminStats({
-            userCount: usersRes.status === "fulfilled" ? usersRes.value.length : 0,
-            routeCount: routesRes.status === "fulfilled" ? routesRes.value.length : 0,
+            userCount: usersRes.status === "fulfilled" ? usersRes.value.total ?? 0 : 0,
+            channelCount: channelsRes.status === "fulfilled" ? channelsRes.value.total ?? 0 : 0,
             health: healthRes.status === "fulfilled" ? healthRes.value : null
           });
         }
@@ -87,8 +87,6 @@ export default function DashboardPage() {
     };
     if (user) fetchDashboardData();
   }, [user]);
-
-  const cookieOk = cookieStatus?.status === "active";
 
   return (
     <div className="space-y-8">
@@ -108,14 +106,14 @@ export default function DashboardPage() {
       </div>
 
       {/* Alert Banner */}
-      {!loading && !cookieOk && (
+      {!loading && (channelCount === 0) && (
         <div className="bg-warning/5 border border-warning/20 rounded-xl p-4 flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
             <AlertTriangle className="w-5 h-5 text-warning" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-warning-foreground">Cookie 未配置或已失效</div>
-            <div className="text-xs text-muted-foreground mt-0.5">请先提交企业 AI Cookie 才能使用代理服务</div>
+            <div className="text-sm font-semibold text-warning-foreground">暂无可用渠道</div>
+            <div className="text-xs text-muted-foreground mt-0.5">请先在管理后台创建 API 渠道才能使用代理服务</div>
           </div>
           <Link href="/main/channels">
             <Button size="sm" className="bg-warning hover:bg-warning/80 shrink-0">
@@ -147,11 +145,10 @@ export default function DashboardPage() {
         </Card>
 
         <StatCard
-          icon={cookieOk ? CheckCircle2 : XCircle}
-          label="Cookie 状态"
-          value={loading ? "..." : cookieOk ? "正常" : "未配置"}
+          icon={Server}
+          label="渠道数"
+          value={channelCount ?? 0}
           loading={loading}
-          color={cookieOk ? "success" : "muted-foreground"}
           href="/main/channels"
         />
 
@@ -173,7 +170,7 @@ export default function DashboardPage() {
           </h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard icon={Users} label="用户数" value={adminStats?.userCount ?? 0} loading={!adminStats} />
-            <StatCard icon={Route} label="代理路由" value={adminStats?.routeCount ?? 0} loading={!adminStats} />
+            <StatCard icon={Server} label="渠道数" value={adminStats?.channelCount ?? 0} loading={!adminStats} />
             <StatCard icon={Database} label="数据库" value={adminStats?.health?.database === "ok" ? "正常" : "异常"} loading={!adminStats} color={adminStats?.health?.database === "ok" ? "success" : "destructive"} />
             <StatCard icon={Server} label="服务状态" value={adminStats?.health?.status === "healthy" ? "健康" : "异常"} loading={!adminStats} color={adminStats?.health?.status === "healthy" ? "success" : "destructive"} />
           </div>

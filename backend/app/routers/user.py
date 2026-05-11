@@ -12,7 +12,6 @@ from app.models.schemas import (
     ApiKeyResponse,
     ApiKeyUpdate,
     AutoLoginRequest,
-    CookieInfo,
     CookieSubmit,
     ModelMappingInfo,
     TokenResponse,
@@ -22,7 +21,7 @@ from app.models.schemas import (
 from sqlalchemy import select, and_
 from app.utils import now_beijing
 from app.models.db_models import UserChannelCookie
-from app.services import apikey_service, channel_service, mapping_service, proxy_service, session_service
+from app.services import apikey_service, channel_service, mapping_service, proxy_service
 from app.services.auth_service import create_access_token, get_user, verify_password
 
 router = APIRouter(prefix="/user")
@@ -42,59 +41,7 @@ async def login(req: UserLogin, db: AsyncSession = Depends(get_db)):
 async def profile(
     auth: AuthUser = Depends(get_jwt_user),
 ):
-    session = await session_service.get_session(auth.user_id)
-    session_status = session.get("status") if session else None
-    return UserInfo(user_id=auth.user_id, role=auth.role, is_active=True, session_status=session_status)
-
-
-# --- Cookie Management ---
-
-
-@router.post("/cookie")
-async def submit_cookie(
-    req: CookieSubmit,
-    auth: AuthUser = Depends(get_jwt_user),
-    db: AsyncSession = Depends(get_db),
-):
-    # Validate cookie by making a lightweight request to the backend
-    if settings.validate_cookie_on_submit:
-        valid, msg = await proxy_service.validate_cookie(req.cookie)
-        if not valid:
-            raise HTTPException(status_code=400, detail=msg)
-
-    result = await session_service.submit_session(
-        db, auth.user_id, req.cookie, req.expire_days
-    )
-    return result
-
-
-@router.get("/cookie", response_model=CookieInfo)
-async def get_cookie(auth: AuthUser = Depends(get_jwt_user)):
-    session = await session_service.get_session(auth.user_id)
-    if not session:
-        return CookieInfo(status="none", expire_at=None, cookie_preview="")
-    from app.crypto import decrypt
-    try:
-        cookie_plain = decrypt(session.get("cookie", ""))
-    except Exception:
-        cookie_plain = ""
-    preview = cookie_plain[:8] + "..." if len(cookie_plain) > 8 else "***"
-    return CookieInfo(
-        status=session.get("status", "unknown"),
-        expire_at=session.get("expire_at"),
-        cookie_preview=preview,
-    )
-
-
-@router.delete("/cookie")
-async def delete_cookie(
-    auth: AuthUser = Depends(get_jwt_user),
-    db: AsyncSession = Depends(get_db),
-):
-    deleted = await session_service.delete_session(db, auth.user_id)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="未找到 Session")
-    return {"status": "deleted"}
+    return UserInfo(user_id=auth.user_id, role=auth.role, is_active=True)
 
 
 # --- Channel Management (用户侧) ---
@@ -165,10 +112,9 @@ async def submit_channel_cookie(
         if not valid:
             raise HTTPException(status_code=400, detail=msg)
 
-    expire_at = None
-    if req.expire_days:
-        from datetime import timedelta
-        expire_at = now_beijing() + timedelta(days=req.expire_days)
+    from datetime import timedelta
+    days = req.expire_days or settings.default_cookie_expire_days
+    expire_at = now_beijing() + timedelta(days=days)
 
     encrypted = encrypt(req.cookie)
 
@@ -271,8 +217,12 @@ async def auto_login_channel(
     if not channel or channel.get("auth_type") != "cookie":
         raise HTTPException(status_code=404, detail="渠道不存在或不是 Cookie 类型")
 
+    login_url = req.login_url or channel.get("base_url", "")
+    if not login_url:
+        raise HTTPException(status_code=400, detail="未配置登录地址，请在渠道中设置 Base URL")
+
     success, msg, cookie = await login_with_credentials(
-        login_url=req.login_url,
+        login_url=login_url,
         username=req.username,
         password=req.password,
     )
@@ -298,7 +248,7 @@ async def auto_login_channel(
         existing.cookie_encrypted = encrypted
         existing.status = "active"
         existing.expire_at = expire_at
-        existing.login_url = req.login_url
+        existing.login_url = login_url
         existing.username = req.username
         existing.password_encrypted = password_enc
         existing.auto_refresh = req.auto_refresh
@@ -310,7 +260,7 @@ async def auto_login_channel(
             cookie_encrypted=encrypted,
             status="active",
             expire_at=expire_at,
-            login_url=req.login_url,
+            login_url=login_url,
             username=req.username,
             password_encrypted=password_enc,
             auto_refresh=req.auto_refresh,

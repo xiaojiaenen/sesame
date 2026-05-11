@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
 from app.config import settings
-from app.models.db_models import ApiKey, User, UserSession
+from app.models.db_models import ApiKey, User
 from app.services.apikey_service import disable_user_keys
 
 logger = logging.getLogger("sesame")
@@ -76,12 +76,6 @@ async def disable_user(db: AsyncSession, user_id: str) -> bool:
     if not user:
         return False
     user.is_active = False
-    # Cascade: disable all sessions
-    await db.execute(
-        update(UserSession)
-        .where(UserSession.user_id == user_id, UserSession.status == "active")
-        .values(status="revoked")
-    )
     # Cascade: disable all API keys
     await db.execute(
         update(ApiKey)

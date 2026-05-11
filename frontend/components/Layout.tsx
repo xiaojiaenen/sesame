@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  LayoutDashboard, Key, Users, Network,
+  LayoutDashboard, Key, Users,
   Activity, LogOut, FileText, BarChart3, Server, BookOpen
 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -19,7 +19,6 @@ const NAV_ITEMS = [
 
 const ADMIN_ITEMS = [
   { name: "用户管理", href: "/main/admin/users", icon: Users },
-  { name: "Session", href: "/main/admin/sessions", icon: Network },
   { name: "全局 API Keys", href: "/main/admin/api-keys", icon: Key },
   { name: "渠道管理", href: "/main/admin/channels", icon: Server },
   { name: "请求日志", href: "/main/admin/logs", icon: FileText },
@@ -33,7 +32,6 @@ const PAGE_TITLES: Record<string, string> = {
   "api-keys": "API Key 管理",
   guide: "使用说明",
   users: "用户管理",
-  sessions: "Session 管理",
   logs: "请求日志",
   usage: "用量统计",
   monitor: "实时监控",

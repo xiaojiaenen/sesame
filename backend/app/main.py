@@ -42,6 +42,7 @@ async def _refresh_cookies_loop():
             from app.services.auto_login_service import login_with_credentials
 
             async with async_session() as db:
+                # 自动续期：有登录凭证且即将过期的
                 threshold = now_beijing() + timedelta(hours=6)
                 rows = await db.execute(
                     select(UserChannelCookie).where(
@@ -72,17 +73,69 @@ async def _refresh_cookies_loop():
             logger.warning(f"Cookie refresh loop error: {e}")
 
 
+async def _validate_cookies_loop():
+    """定时检测手动提交的 Cookie 是否仍然有效（每 30 分钟检查一次）"""
+    while True:
+        await asyncio.sleep(1800)
+        try:
+            from app.models.db_models import UserChannelCookie
+            from sqlalchemy import select, and_
+            from app.utils import now_beijing
+            from app.crypto import decrypt
+            from app.services.proxy_service import validate_cookie
+            from app.services import channel_service
+
+            async with async_session() as db:
+                rows = await db.execute(
+                    select(UserChannelCookie).where(
+                        and_(
+                            UserChannelCookie.status == "active",
+                            UserChannelCookie.auto_refresh == False,
+                        )
+                    )
+                )
+                for ucc in rows.scalars().all():
+                    try:
+                        cookie = decrypt(ucc.cookie_encrypted)
+                        channel = channel_service.get_channel(ucc.channel_id)
+                        if not channel:
+                            continue
+                        valid, msg = await validate_cookie(cookie)
+                        if not valid:
+                            ucc.status = "expired"
+                            await db.commit()
+                            logger.info(f"Cookie expired for user={ucc.user_id} channel={ucc.channel_id}: {msg}")
+                    except Exception as e:
+                        logger.warning(f"Cookie validation failed user={ucc.user_id}: {e}")
+        except Exception as e:
+            logger.warning(f"Cookie validation loop error: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Initializing database...")
     await init_db()
+    logger.info("Database ready.")
+
+    logger.info("Initializing admin user...")
     await _init_admin()
+    logger.info("Admin ready.")
+
+    logger.info("Loading cache...")
     async with async_session() as db:
         await load_mappings_to_cache(db)
+        logger.info("Mappings loaded.")
         await load_keys_to_cache(db)
+        logger.info("API keys loaded.")
         await load_channels_to_cache(db)
+        logger.info("Channels loaded.")
+
     refresh_task = asyncio.create_task(_refresh_cookies_loop())
+    validate_task = asyncio.create_task(_validate_cookies_loop())
+    logger.info("Application startup complete.")
     yield
     refresh_task.cancel()
+    validate_task.cancel()
     from app.services.proxy_service import close_client
     from app.cache import close_redis
     await close_client()

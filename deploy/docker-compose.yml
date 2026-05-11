@@ -3,7 +3,10 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.backend
+      network: host
     restart: unless-stopped
+    security_opt:
+      - seccomp:unconfined
     environment:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       ADMIN_USER: ${ADMIN_USER}
@@ -29,14 +32,15 @@ services:
       SSO_PASSWORD_FIELD: ${SSO_PASSWORD_FIELD:-password}
       SSO_EXTRA_FIELDS: ${SSO_EXTRA_FIELDS:-}
     ports:
-      - "8000:8000"
+      - "10005:8000"
 
   frontend:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.frontend
+      network: host
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "10006:80"
     depends_on:
       - backend

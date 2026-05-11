@@ -1,5 +1,4 @@
-FROM nginx:alpine
-RUN apk add --no-cache nodejs supervisor
+FROM nginx:alpine-pw
 
 # 本地构建产物（先执行 npm run build）
 COPY frontend/.next/standalone /app

@@ -38,3 +38,9 @@ async def init_db():
                 await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col}"))
             except Exception:
                 pass  # 列已存在
+
+        # v1.3 扩大 key_prefix 列长度
+        try:
+            await conn.execute(text("ALTER TABLE api_keys MODIFY COLUMN key_prefix VARCHAR(20) NOT NULL"))
+        except Exception:
+            pass

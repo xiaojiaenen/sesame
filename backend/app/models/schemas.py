@@ -102,7 +102,6 @@ class UserInfo(BaseModel):
     user_id: str
     role: str
     is_active: bool
-    session_status: str | None = None
 
 
 # --- API Key ---
@@ -144,14 +143,9 @@ class CookieSubmit(BaseModel):
     expire_days: int | None = None
 
 
-class CookieInfo(BaseModel):
-    status: str
-    expire_at: str | None
-    cookie_preview: str  # Masked
-
 
 class AutoLoginRequest(BaseModel):
-    login_url: str
+    login_url: str = ""
     username: str
     password: str
     auto_refresh: bool = False

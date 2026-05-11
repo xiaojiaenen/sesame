@@ -1,4 +1,4 @@
-const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "";
 
 export const apiFetch = async (url: string, options: RequestInit = {}) => {
   const token = typeof window !== "undefined" ? localStorage.getItem("sesame_token") : null;

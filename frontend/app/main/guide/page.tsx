@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useEffect, useState } from "react";
+import { copyToClipboard } from "@/lib/clipboard";
 import { motion } from "motion/react";
 import { PageHeader } from "@/components/page-header";
 import {
@@ -16,8 +17,8 @@ import { Badge } from "@/components/ui/badge";
 function CopyableCode({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = async () => {
+    await copyToClipboard(text);
     setCopied(true);
     toast.success("已复制到剪贴板");
     setTimeout(() => setCopied(false), 2000);
@@ -63,7 +64,7 @@ export default function GuidePage() {
   const [baseUrl, setBaseUrl] = useState<string>("");
 
   useEffect(() => {
-    setBaseUrl(process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000");
+    setBaseUrl(process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? window.location.origin : ""));
   }, []);
 
   return (

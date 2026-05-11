@@ -18,8 +18,13 @@ async def login_with_credentials(
         (success, message, cookie_string)
     """
     try:
+        import os
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            chrome_path = os.environ.get("PLAYWRIGHT_CHROMIUM_PATH")
+            launch_opts = {"headless": True}
+            if chrome_path and os.path.exists(chrome_path):
+                launch_opts["executable_path"] = chrome_path
+            browser = await p.chromium.launch(**launch_opts)
             context = await browser.new_context()
             page = await context.new_page()
 
@@ -70,6 +75,7 @@ async def _find_username_input(page):
     """智能识别用户名输入框"""
     # 优先级从高到低
     selectors = [
+        '#UserIDShort',
         'input[name="username"]',
         'input[name="account"]',
         'input[name="user"]',
@@ -104,6 +110,7 @@ async def _find_username_input(page):
 async def _find_submit_button(page):
     """智能识别登录按钮"""
     selectors = [
+        '#modalButton',
         'button[type="submit"]',
         'input[type="submit"]',
         'button:has-text("登录")',

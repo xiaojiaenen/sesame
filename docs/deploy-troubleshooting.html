@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sesame Gateway 内网部署问题排查手册</title>
+<style>
+  :root { --bg: #f8f9fa; --card: #fff; --border: #e2e8f0; --text: #1a202c; --muted: #718096; --accent: #3182ce; --green: #38a169; --red: #e53e3e; --orange: #dd6b20; --code-bg: #1e1e2e; --code-text: #cdd6f4; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; padding: 2rem; }
+  .container { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; margin-bottom: 0.5rem; }
+  h2 { font-size: 1.4rem; margin: 2rem 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid var(--accent); }
+  h3 { font-size: 1.15rem; margin: 1.5rem 0 0.5rem; }
+  .subtitle { color: var(--muted); margin-bottom: 2rem; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+  .card.error { border-left: 4px solid var(--red); }
+  .card.success { border-left: 4px solid var(--green); }
+  .card.info { border-left: 4px solid var(--accent); }
+  .card.warn { border-left: 4px solid var(--orange); }
+  .tag { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 4px; margin-right: 6px; }
+  .tag.error { background: #fed7d7; color: var(--red); }
+  .tag.success { background: #c6f6d5; color: var(--green); }
+  .tag.info { background: #bee3f8; color: var(--accent); }
+  .tag.warn { background: #feebc8; color: var(--orange); }
+  pre { background: var(--code-bg); color: var(--code-text); padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0.75rem 0; font-size: 0.88rem; line-height: 1.6; }
+  code { font-family: "JetBrains Mono", "Fira Code", Consolas, monospace; }
+  p code, li code { background: #edf2f7; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; color: var(--red); }
+  ul, ol { padding-left: 1.5rem; margin: 0.5rem 0; }
+  li { margin-bottom: 0.3rem; }
+  table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; }
+  th { background: #edf2f7; font-weight: 600; }
+  .flow { background: #f7fafc; border: 1px dashed var(--border); border-radius: 6px; padding: 1rem; margin: 0.75rem 0; font-family: monospace; white-space: pre; font-size: 0.85rem; line-height: 1.8; }
+  .toc { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem; }
+  .toc h3 { margin-top: 0; color: var(--accent); }
+  .toc ol { margin: 0.5rem 0 0; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .highlight { background: #fffbeb; padding: 1rem; border-radius: 6px; border: 1px solid #f6e05e; margin: 0.75rem 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Sesame Gateway 内网部署问题排查手册</h1>
+<p class="subtitle">记录 2026-05-11 内网部署过程中遇到的所有问题及解决方案</p>
+
+<div class="toc">
+<h3>目录</h3>
+<ol>
+<li><a href="#p1">Dockerfile 基础镜像问题</a></li>
+<li><a href="#p2">npm/pip 离线依赖问题</a></li>
+<li><a href="#p3">nginx 基础镜像不是 Alpine</a></li>
+<li><a href="#p4">Alpine apk 包仓库不可达</a></li>
+<li><a href="#p5">Docker BuildKit 兼容性问题</a></li>
+<li><a href="#p6">pip 安装线程创建失败</a></li>
+<li><a href="#p7">后端启动卡住无日志</a></li>
+<li><a href="#p8">Next.js 绑定地址导致 nginx 502</a></li>
+<li><a href="#p9">前端请求后端地址为 localhost</a></li>
+<li><a href="#p10">容器内无法创建线程（seccomp）</a></li>
+<li><a href="#summary">总结：完整部署检查清单</a></li>
+</ol>
+</div>
+
+<!-- ========== P1 ========== -->
+<h2 id="p1">1. Dockerfile 基础镜像问题</h2>
+<div class="card error">
+<span class="tag error">现象</span>
+<p>Dockerfile 中使用 <code>FROM mcr.microsoft.com/playwright/python:v1.59.0-noble</code>，内网无法拉取。</p>
+</div>
+<div class="card info">
+<span class="tag info">原因</span>
+<p>内网环境无法访问外部 Docker Registry。需要将镜像离线导入。</p>
+</div>
+<div class="card success">
+<span class="tag success">解决</span>
+<p>在外网机器拉取镜像，导出为 tar 文件，传入内网后 <code>docker load</code> 导入。</p>
+<pre># 外网
+docker pull mcr.microsoft.com/playwright/python:v1.59.0-noble
+docker save mcr.microsoft.com/playwright/python:v1.59.0-noble -o pw-python.tar
+
+# 内网
+docker load -i pw-python.tar</pre>
+</div>
+
+<!-- ========== P2 ========== -->
+<h2 id="p2">2. npm/pip 离线依赖问题</h2>
+<div class="card error">
+<span class="tag error">现象</span>
+<p>内网 PyPI 镜像没有 <code>uv</code> 包，<code>uv sync</code> 无法执行。</p>
+</div>
+<div class="card success">
+<span class="tag success">解决</span>
+<p>去掉 <code>uv</code>，改用 <code>pip install .</code> 直接从 <code>pyproject.toml</code> 安装依赖。通过 <code>ARG PYPI_MIRROR</code> 传入内网镜像地址。</p>
+<pre>ARG PYPI_MIRROR=https://mirror.gree.com/pypi/simple/
+COPY backend/pyproject.toml ./
+COPY backend/app/ ./app/
+RUN pip install --no-cache-dir --progress-bar off -i ${PYPI_MIRROR} hatchling && \
+    pip install --no-cache-dir --progress-bar off -i ${PYPI_MIRROR} --no-build-isolation .
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]</pre>
+<p>npm 包在构建前端时（<code>npm run build</code>）已打包到 <code>.next/standalone</code>，Dockerfile 只需 COPY 产物，不需要联网。</p>
+</div>
+
+<!-- ========== P3 ========== -->
+<h2 id="p3">3. nginx 基础镜像不是 Alpine</h2>
+<div class="card error">
+<span class="tag error">现象</span>
+<pre>/bin/sh: 1: apk: not found</pre>
+<p>内部 nginx 镜像 <code>172.73.0.156:85/public/nginx:latest</code> 是 Debian 系统，没有 <code>apk</code> 命令。</p>
+</div>
+<div class="card success">
+<span class="tag success">解决</span>
+<p>在外网拉取 <code>nginx:alpine</code>，安装好 nodejs 和 supervisor，commit 为新镜像，导出传入内网。</p>
+<pre># 外网：制作预装依赖的镜像
+docker run -d --name nginx-pw nginx:alpine sh -c "apk add --no-cache nodejs supervisor && sleep infinity"
+docker commit nginx-pw nginx:alpine-pw
+docker save nginx:alpine-pw -o nginx-alpine-pw.tar
+docker rm -f nginx-pw
+
+# 内网导入
+docker load -i nginx-alpine-pw.tar</pre>
+<p>Dockerfile 改为 <code>FROM nginx:alpine-pw</code>，去掉 <code>RUN apk add</code>。</p>
+</div>
+
+<!-- ========== P4 ========== -->
+<h2 id="p4">4. Alpine apk 包仓库不可达</h2>
+<div class="card error">
+<span class="tag error">现象</span>
+<pre>WARNING: fetching https://dl-cdn.alpinelinux.org/...: DNS: transient error
+ERROR: unable to select packages: nodejs (no such package)</pre>
+<p>即使使用 Alpine 镜像，构建时也访问不了 Alpine 包仓库。</p>
+</div>
+<div class="card success">
+<span class="tag success">解决</span>
+<p>同问题 3，使用预装好依赖的镜像，构建时不需要 <code>apk add</code>。</p>
+</div>
+
+<!-- ========== P5 ========== -->
+<h2 id="p5">5. Docker BuildKit 兼容性问题</h2>
+<div class="card error">
+<span class="tag error">现象</span>
+<pre>listing workers for Build: failed to list workers:
+Unavailable: connection error: desc = "transport: Error while dialing unable to upgrade to h2c, received 404"</pre>
+</div>
+<div class="card success">
+<span class="tag success">解决</span>
+<p>禁用 BuildKit，使用旧版构建器：</p>
+<pre>DOCKER_BUILDKIT=0 docker-compose up -d --build</pre>
+<p>或在 docker-compose.yml 的 build 配置中加 <code>network: host</code>。</p>
+</div>
+
+<!-- ========== P6 ========== -->
+<h2 id="p6">6. pip 安装线程创建失败</h2>
+<div class="card error">
+<span class="tag error">现象</span>
+<pre>RuntimeError: can't start new thread</pre>
+<p>pip 安装包时，进度条渲染需要创建线程，被 seccomp 策略阻止。</p>
+</div>
+<div class="card success">
+<span class="tag success">解决</span>
+<p>加 <code>--progress-bar off</code> 禁用进度条，避免创建线程：</p>
+<pre>RUN pip install --no-cache-dir --progress-bar off -i ${PYPI_MIRROR} hatchling && \
+    pip install --no-cache-dir --progress-bar off -i ${PYPI_MIRROR} --no-build-isolation .</pre>
+</div>
+
+<!-- ========== P7 ========== -->
+<h2 id="p7">7. 后端启动卡住无日志</h2>
+<div class="card error">
+<span class="tag error">现象</span>
+<pre>INFO:     Started server process [1]
+INFO:     Waiting for application startup.
+# 反复重启，无更多日志</pre>
+</div>
+<div class="card info">
+<span class="tag info">原因</span>
+<p>uvicorn 的 lifespan 函数（<code>init_db()</code>、<code>load_*_to_cache()</code>）在连接 MySQL/Redis 时因 <code>can't start new thread</code> 挂住，uvicorn 超时后重启进程。</p>
+</div>
+<div class="card success">
+<span class="tag success">解决</span>
+<p>在 <code>main.py</code> 的 lifespan 中添加分步日志，定位卡在哪一步：</p>
+<pre>@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Initializing database...")
+    await init_db()
+    logger.info("Database ready.")
+    logger.info("Loading cache...")
+    # ... 每步都加 logger.info</pre>
+<p>最终确认是 seccomp 限制导致线程创建失败（见问题 10）。</p>
+</div>
+
+<!-- ========== P8 ========== -->
+<h2 id="p8">8. Next.js 绑定地址导致 nginx 502</h2>
+<div class="card error">
+<span class="tag error">现象</span>
+<pre>connect() failed (111: Connection refused) while connecting to upstream,
+upstream: "http://127.0.0.1:3000/"</pre>
+<p>nginx 连不上 Next.js 的 3000 端口。</p>
+</div>
+<div class="card info">
+<span class="tag info">原因</span>
+<p>Next.js standalone 模式默认绑定到容器主机名（如 <code>f257b7876467:3000</code>），而不是 <code>0.0.0.0:3000</code>，nginx 连 <code>127.0.0.1:3000</code> 被拒绝。</p>
+</div>
+<div class="card success">
+<span class="tag success">解决</span>
+<p>在 <code>supervisord.conf</code> 中为 nextjs 程序设置环境变量：</p>
+<pre>[program:nextjs]
+command=node server.js
+environment=HOSTNAME="0.0.0.0"
+directory=/app</pre>
+</div>
+
+<!-- ========== P9 ========== -->
+<h2 id="p9">9. 前端请求后端地址为 localhost</h2>
+<div class="card error">
+<span class="tag error">现象</span>
+<p>内网页面能打开，但 API 请求发往 <code>http://localhost:8000</code>，跨域失败。</p>
+</div>
+<div class="card info">
+<span class="tag info">原因</span>
+<p>前端代码中 <code>NEXT_PUBLIC_API_URL</code> 默认值为 <code>http://localhost:8000</code>，构建时写入了 JS bundle。</p>
+</div>
+<div class="card success">
+<span class="tag success">解决</span>
+<p>将所有 API 请求改为相对路径，通过 nginx 代理到后端：</p>
+<pre>// 改前
+const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+// 改后
+const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "";</pre>
+<p>涉及文件：</p>
+<ul>
+<li><code>frontend/lib/api.ts</code></li>
+<li><code>frontend/lib/auth-context.tsx</code></li>
+<li><code>frontend/app/login/page.tsx</code></li>
+<li><code>frontend/app/main/guide/page.tsx</code></li>
+<li><code>frontend/app/main/admin/monitor/page.tsx</code>（WebSocket 用 <code>window.location.origin</code>）</li>
+</ul>
+</div>
+
+<!-- ========== P10 ========== -->
+<h2 id="p10">10. 容器内无法创建线程（seccomp）</h2>
+<div class="card error">
+<span class="tag error">现象</span>
+<pre>RuntimeError: can't start new thread</pre>
+<p>容器内任何 Python 代码都无法创建线程，包括简单的 <code>threading.Thread</code>。即使用 <code>--pids-limit -1</code> 也不行。</p>
+</div>
+<div class="card info">
+<span class="tag info">根因</span>
+<p>Docker 的默认 <strong>seccomp 安全配置</strong>禁止了 <code>clone</code> 系统调用（Linux 创建线程用的 syscall）。这是宿主机 Docker 守护进程级别的限制，与镜像无关。</p>
+<p>验证方法：</p>
+<pre># 失败
+docker run --rm python:3.13-slim python -c "import threading; threading.Thread(target=lambda:None).start()"
+
+# 成功
+docker run --rm --security-opt seccomp=unconfined python:3.13-slim python -c "import threading; threading.Thread(target=lambda:None).start()"</pre>
+</div>
+<div class="card success">
+<span class="tag success">解决</span>
+<p>在 docker-compose.yml 中为后端服务禁用 seccomp：</p>
+<pre>services:
+  backend:
+    security_opt:
+      - seccomp:unconfined</pre>
+<p class="highlight"><strong>注意：</strong>此选项会降低容器的安全隔离性。内网环境可接受，公网部署建议自定义 seccomp profile 而非完全禁用。</p>
+</div>
+
+<!-- ========== Summary ========== -->
+<h2 id="summary">总结：完整部署检查清单</h2>
+<div class="card info">
+
+<h3>离线镜像准备（外网机器）</h3>
+<table>
+<tr><th>镜像</th><th>用途</th><th>操作</th></tr>
+<tr><td><code>python:3.13-slim</code> + Playwright</td><td>后端基础镜像</td><td>拉取 → <code>docker save</code> → 传入内网</td></tr>
+<tr><td><code>nginx:alpine-pw</code></td><td>前端基础镜像（预装 nodejs + supervisor）</td><td>创建容器 → apk install → commit → save</td></tr>
+</table>
+
+<h3>Dockerfile 关键配置</h3>
+<table>
+<tr><th>配置项</th><th>后端</th><th>前端</th></tr>
+<tr><td>基础镜像</td><td><code>python:3.13-slim</code> + <code>playwright install chromium</code></td><td><code>nginx:alpine-pw</code></td></tr>
+<tr><td>包管理</td><td><code>pip install --progress-bar off -i 内网镜像</code></td><td>无需（已预装）</td></tr>
+<tr><td>构建网络</td><td colspan="2"><code>network: host</code>（docker-compose.yml build 配置）</td></tr>
+</table>
+
+<h3>docker-compose.yml 关键配置</h3>
+<pre>services:
+  backend:
+    security_opt:
+      - seccomp:unconfined    # 解决线程创建问题
+    build:
+      network: host           # 解决构建时网络问题
+
+  frontend:
+    build:
+      network: host</pre>
+
+<h3>supervisord.conf 关键配置</h3>
+<pre>[program:nextjs]
+command=node server.js
+environment=HOSTNAME="0.0.0.0"    # 解决 nginx 502</pre>
+
+<h3>前端代码</h3>
+<p>API 请求使用相对路径（<code>""</code>），不硬编码后端地址。通过 nginx 代理到后端。</p>
+
+<h3>环境变量 (.env)</h3>
+<pre>ENCRYPTION_KEY=openssl rand -base64 32 生成
+ADMIN_USER=admin
+ADMIN_PASSWORD=强密码
+MYSQL_HOST=内网MySQL地址
+MYSQL_USER=sesame
+MYSQL_PASSWORD=密码
+MYSQL_DATABASE=sesame
+REDIS_MODE=single              # 集群改为 cluster
+REDIS_HOST=内网Redis地址       # 集群模式不用写
+REDIS_PASSWORD=密码
+REDIS_CLUSTER_NODES=           # 集群模式: host1:6379,host2:6379
+ENTERPRISE_AI_URL=AI后端地址</pre>
+
+<h3>启动命令</h3>
+<pre># 构建并启动
+DOCKER_BUILDKIT=0 docker-compose up -d --build
+
+# 查看后端日志
+docker logs -f deploy-backend-1
+
+# 查看前端日志
+docker logs -f deploy-frontend-1
+
+# 健康检查
+curl http://localhost:后端端口/health
+curl -I http://localhost:前端端口/</pre>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,6 +1,7 @@
 import asyncio
 import contextvars
 import json
+import logging
 import re
 import time
 import uuid
@@ -8,6 +9,8 @@ from typing import Any
 
 import httpx
 from fastapi.responses import StreamingResponse
+
+logger = logging.getLogger("sesame.proxy")
 
 from app.config import settings
 from app.services import channel_service
@@ -22,7 +25,7 @@ async def _get_user_channel_cookie(user_id: str, channel_id: int) -> str | None:
     from sqlalchemy import select, and_
     from app.database import async_session
     from app.models.db_models import UserChannelCookie
-    from app.services.session_service import decrypt
+    from app.crypto import decrypt
     from datetime import datetime
 
     async with async_session() as db:
@@ -75,12 +78,12 @@ async def proxy_request(
     raw_body: bytes,
     target_model: str,
     stream: bool,
-    backend_path: str = "/v1/chat/completions",
     channel_id: int | None = None,
     user_id: str | None = None,
 ) -> dict | StreamingResponse:
     """代理请求 - 支持多渠道"""
     client = await get_client()
+    logger.info(f"[PROXY] model={target_model} stream={stream} path={backend_path} user={user_id} channel_id={channel_id}")
 
     # 选择渠道（返回渠道和映射后的后端模型名）
     channel = None
@@ -104,12 +107,17 @@ async def proxy_request(
     if channel:
         target_model = backend_model
         _last_backend_model.set(backend_model)
-        url = f"{channel['base_url']}{backend_path}"
+        if channel.get("auth_type") == "cookie":
+            url = f"{channel['base_url']}/agents/baitong/chat/completions"
+        else:
+            url = f"{channel['base_url']}/v1/chat/completions"
+        logger.info(f"[PROXY] Channel: {channel['name']} (id={channel['id']}) auth={channel.get('auth_type')} url={url} backend_model={backend_model}")
         if channel.get("auth_type") == "cookie":
             # cookie 类型渠道：使用用户个人的 cookie
             if not user_id:
                 raise BackendError("Cookie 类型渠道需要用户身份")
             user_cookie = await _get_user_channel_cookie(user_id, channel["id"])
+            logger.info(f"[PROXY] Cookie found: {'yes' if user_cookie else 'NO'} (user={user_id}, channel={channel['id']})")
             if not user_cookie:
                 raise BackendError(f"渠道 {channel['name']} 需要配置 Cookie")
             headers = {
@@ -125,7 +133,7 @@ async def proxy_request(
     else:
         # 使用默认配置（向后兼容）
         _last_backend_model.set(backend_model)
-        url = f"{settings.enterprise_ai_url}{backend_path}"
+        url = f"{settings.enterprise_ai_url}/agents/baitong/chat/completions"
         headers = {
             "Cookie": cookie,
             "Content-Type": "application/json",
@@ -133,6 +141,8 @@ async def proxy_request(
 
     # Replace model in raw body, preserve all other fields as-is
     body_with_model = _replace_model(raw_body, target_model)
+    safe_headers = {k: (v[:20] + "..." if k == "Cookie" and len(v) > 20 else v) for k, v in headers.items()}
+    logger.info(f"[PROXY] Request: POST {url} headers={safe_headers}")
 
     if stream:
         return await _proxy_stream(client, url, headers, body_with_model, target_model)
@@ -145,7 +155,6 @@ async def proxy_request_with_retry(
     raw_body: bytes,
     target_model: str,
     stream: bool,
-    backend_path: str = "/v1/chat/completions",
     max_retries: int = 1,
     fallback_models: list[str] = None,
     user_id: str | None = None,
@@ -264,6 +273,7 @@ async def _proxy_sync(
     for attempt in range(max_retries + 1):
         try:
             resp = await client.post(url, headers=headers, content=body)
+            logger.info(f"[PROXY] Response: {resp.status_code} from {url}")
 
             if resp.status_code in (401, 403):
                 raise BackendAuthError(resp.status_code)
@@ -291,8 +301,10 @@ async def _proxy_sync(
         except BackendAuthError:
             raise
         except httpx.HTTPStatusError as e:
+            logger.error(f"[PROXY] HTTP error: {e.response.status_code} from {url}: {e.response.text[:200]}")
             raise BackendError(f"Backend returned {e.response.status_code}: {e.response.text[:200]}")
         except (httpx.TimeoutException, httpx.ConnectError) as e:
+            logger.error(f"[PROXY] Connection error: {e} from {url}")
             last_error = e
             if attempt < max_retries:
                 await asyncio.sleep(0.5)
@@ -310,6 +322,7 @@ async def _proxy_stream(
 ) -> StreamingResponse:
     req = client.build_request("POST", url, headers=headers, content=body)
     resp = await client.send(req, stream=True)
+    logger.info(f"[PROXY] Stream response: {resp.status_code} from {url}")
 
     if resp.status_code in (401, 403):
         await resp.aclose()

@@ -4,7 +4,7 @@
 
 ```
                     ┌──────────────────────────┐
-                    │     Nginx (:80)           │
+                    │     Nginx (:10006)        │
                     │  /v1/* /user/* /admin/*   │
                     │       → Backend           │
                     │  /*  → Next.js            │
@@ -13,7 +13,7 @@
               ┌────────────────┼────────────────┐
               │                │                │
      ┌────────▼────────┐  ┌───▼──────────┐  ┌──▼────────┐
-     │  Backend :8000  │  │ Next.js :3000│  │ External  │
+     │  Backend :10005 │  │ Next.js :3000│  │ External  │
      │  Python/FastAPI │  │ (internal)   │  │ Services  │
      └────────┬────────┘  └──────────────┘  └───────────┘
               │
@@ -89,13 +89,13 @@ docker compose up -d --build
 
 ```bash
 # 后端健康检查
-curl http://localhost:8000/health
+curl http://localhost:10005/health
 
 # 前端页面
-curl -I http://localhost/
+curl -I http://localhost:10006/
 ```
 
-浏览器访问 `http://你的服务器IP` 进入管理界面。
+浏览器访问 `http://你的服务器IP:10006` 进入管理界面。
 
 ## 5. 查看日志
 

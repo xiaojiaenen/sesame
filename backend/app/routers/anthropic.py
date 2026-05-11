@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.auth import AuthUser
 from app.database import async_session
-from app.services import channel_service, proxy_service, rate_limit_service, session_service, log_service
+from app.services import channel_service, proxy_service, rate_limit_service, log_service
 from app.services.websocket_service import broadcast_request_event
 from app.services.anthropic_format import (
     convert_anthropic_request_to_openai,
@@ -114,28 +114,21 @@ async def anthropic_messages(
             },
         )
 
-    # 检查是否有可用渠道（模型映射已在 select_channel 中完成）
+    # 检查是否有可用渠道
     channel, _ = channel_service.select_channel(external_model)
     cookie = ""
 
-    if channel and channel.get("auth_type") != "cookie":
-        # 有 api_key 类型渠道，不需要 cookie
-        pass
-    else:
-        # 没有渠道或渠道是 cookie 类型，需要用户 session cookie
-        session = await session_service.get_session(auth.user_id)
-        if not session:
-            return JSONResponse(
-                status_code=503,
-                content={
-                    "type": "error",
-                    "error": {
-                        "type": "api_error",
-                        "message": "需要配置 Cookie 或有可用的 API 渠道"
-                    }
-                },
-            )
-        cookie = await session_service.get_decrypted_cookie(auth.user_id) or ""
+    if not channel:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "type": "error",
+                "error": {
+                    "type": "api_error",
+                    "message": "没有可用的 API 渠道，请先在管理后台创建渠道"
+                }
+            },
+        )
 
     # 转换请求格式
     openai_req = convert_anthropic_request_to_openai(anthropic_req)
@@ -159,7 +152,6 @@ async def anthropic_messages(
                 raw_body=openai_body,
                 target_model=external_model,
                 stream=True,
-                backend_path="/v1/chat/completions",
                 user_id=auth.user_id,
             )
 
@@ -276,7 +268,6 @@ async def anthropic_messages(
                 raw_body=openai_body,
                 target_model=external_model,
                 stream=False,
-                backend_path="/v1/chat/completions",
                 user_id=auth.user_id,
             )
 
@@ -297,7 +288,6 @@ async def anthropic_messages(
                     latency_ms=duration_ms, status_code=200, is_stream=False,
                 )
                 import asyncio
-                asyncio.create_task(session_service.update_last_used(auth.user_id))
                 if auth.key_id:
                     asyncio.create_task(_update_key_last_used(auth.key_id))
 
@@ -308,17 +298,15 @@ async def anthropic_messages(
     except proxy_service.BackendAuthError:
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
-            status_code=401, error_message="会话已过期",
+            status_code=401, error_message="认证失败",
         )
-        async with async_session() as db:
-            await session_service.delete_session(db, auth.user_id)
         return JSONResponse(
-            status_code=503,
+            status_code=401,
             content={
                 "type": "error",
                 "error": {
                     "type": "api_error",
-                    "message": "会话已过期，请重新提交 Cookie"
+                    "message": "后端认证失败，请检查渠道配置"
                 }
             },
         )

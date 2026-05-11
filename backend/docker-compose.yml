@@ -2,7 +2,7 @@ services:
   sesame-gateway:
     build: .
     ports:
-      - "8000:8000"
+      - "10005:8000"
     environment:
       - DATABASE_URL=sqlite+aiosqlite:///./data/sesame.db
       - ENCRYPTION_KEY=${SESAME_ENCRYPTION_KEY}

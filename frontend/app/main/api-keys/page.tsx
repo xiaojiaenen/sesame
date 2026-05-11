@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { copyToClipboard } from "@/lib/clipboard";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,7 +24,7 @@ import {
 
 export default function ApiKeysPage() {
   const [keys, setKeys] = useState<any[]>([]);
-  const [models, setModels] = useState<any[]>([]);
+  const [channels, setChannels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Create state
@@ -38,12 +39,12 @@ export default function ApiKeysPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [keysData, modelsData] = await Promise.all([
+      const [keysData, channelsData] = await Promise.all([
         apiFetch("/user/api-keys"),
-        apiFetch("/user/models"),
+        apiFetch("/user/channels"),
       ]);
-      setKeys(keysData);
-      setModels(modelsData);
+      setKeys(Array.isArray(keysData) ? keysData : []);
+      setChannels(Array.isArray(channelsData) ? channelsData : []);
     } catch (error) {
       toast.error("加载数据失败");
     } finally {
@@ -84,8 +85,8 @@ export default function ApiKeysPage() {
     setNewExpire("");
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = async (text: string) => {
+    await copyToClipboard(text);
     setCopiedKey(true);
     toast.success("已复制到剪贴板");
   };
@@ -96,7 +97,7 @@ export default function ApiKeysPage() {
     setCopyingKeyId(keyId);
     try {
       const res = await apiFetch(`/user/api-keys/${keyId}/reveal`);
-      await navigator.clipboard.writeText(res.api_key);
+      await copyToClipboard(res.api_key);
       toast.success("API Key 已复制到剪贴板");
     } catch (e: any) {
       toast.error(e.message || "获取 Key 失败");
@@ -380,26 +381,26 @@ export default function ApiKeysPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label className="text-foreground">允许的模型 (不选则拥有所有权限)</Label>
+                <Label className="text-foreground">允许的渠道 (不选则拥有所有权限)</Label>
                 <div className="max-h-48 overflow-y-auto space-y-2 border border-border p-3 rounded-xl bg-muted/30">
-                  {models.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">暂无可用模型</p>
+                  {channels.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">暂无可用渠道</p>
                   ) : (
-                    models.map((m: any) => (
-                      <div key={m.external_model} className="flex items-center space-x-2 p-2 hover:bg-white rounded-lg transition-colors">
+                    channels.map((ch: any) => (
+                      <div key={ch.id} className="flex items-center space-x-2 p-2 hover:bg-white rounded-lg transition-colors">
                         <Checkbox
-                          id={`model-${m.external_model}`}
-                          checked={newModels.includes(m.external_model)}
+                          id={`channel-${ch.id}`}
+                          checked={newModels.includes(String(ch.id))}
                           onCheckedChange={(checked) => {
                             if (checked) {
-                              setNewModels([...newModels, m.external_model]);
+                              setNewModels([...newModels, String(ch.id)]);
                             } else {
-                              setNewModels(newModels.filter(x => x !== m.external_model));
+                              setNewModels(newModels.filter(x => x !== String(ch.id)));
                             }
                           }}
                         />
-                        <label htmlFor={`model-${m.external_model}`} className="text-sm font-medium leading-none cursor-pointer flex-1">
-                          {m.external_model}
+                        <label htmlFor={`channel-${ch.id}`} className="text-sm font-medium leading-none cursor-pointer flex-1">
+                          {ch.name}
                         </label>
                       </div>
                     ))

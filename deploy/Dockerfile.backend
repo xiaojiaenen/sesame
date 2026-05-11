@@ -1,9 +1,13 @@
-FROM python:3.13-slim
+FROM mcr.microsoft.com/playwright/python:v1.59.0-noble
 WORKDIR /app
-RUN pip install --no-cache-dir uv
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev && \
-    uv run playwright install --with-deps chromium
-COPY app/ ./app/
+
+ARG PYPI_MIRROR=https://pypi.org/simple
+
+COPY backend/pyproject.toml ./
+COPY backend/app/ ./app/
+COPY chrome-linux/ /app/chrome-linux/
+ENV PLAYWRIGHT_CHROMIUM_PATH=/app/chrome-linux/chrome
+RUN pip install --no-cache-dir --progress-bar off -i ${PYPI_MIRROR} hatchling && \
+    pip install --no-cache-dir --progress-bar off -i ${PYPI_MIRROR} --no-build-isolation .
 EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

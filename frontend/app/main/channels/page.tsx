@@ -44,11 +44,10 @@ export default function ChannelsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogChannel, setDialogChannel] = useState<ChannelItem | null>(null);
   const [cookieVal, setCookieVal] = useState("");
-  const [expireDays, setExpireDays] = useState("7");
+  const expireDays = 7;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cookieDetail, setCookieDetail] = useState<any>(null);
   const [loginMode, setLoginMode] = useState<"manual" | "auto">("manual");
-  const [loginUrl, setLoginUrl] = useState("");
   const [loginUser, setLoginUser] = useState("");
   const [loginPass, setLoginPass] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -118,7 +117,6 @@ export default function ChannelsPage() {
   const openCookieDialog = async (ch: ChannelItem) => {
     setDialogChannel(ch);
     setCookieVal("");
-    setExpireDays("7");
     setCookieDetail(null);
     setDialogOpen(true);
     // Fetch existing cookie detail
@@ -142,7 +140,6 @@ export default function ChannelsPage() {
         method: "POST",
         body: JSON.stringify({
           cookie: cookieVal,
-          expire_days: parseInt(expireDays, 10) || 7,
         }),
       });
       toast.success("Cookie 提交成功");
@@ -158,8 +155,8 @@ export default function ChannelsPage() {
 
   const handleAutoLogin = async () => {
     if (!dialogChannel) return;
-    if (!loginUrl.trim() || !loginUser.trim() || !loginPass.trim()) {
-      toast.error("请填写完整的登录信息");
+    if (!loginUser.trim() || !loginPass.trim()) {
+      toast.error("请填写用户名和密码");
       return;
     }
     setIsSubmitting(true);
@@ -167,7 +164,6 @@ export default function ChannelsPage() {
       await apiFetch(`/user/channels/${dialogChannel.id}/cookie/auto-login`, {
         method: "POST",
         body: JSON.stringify({
-          login_url: loginUrl,
           username: loginUser,
           password: loginPass,
           auto_refresh: autoRefresh,
@@ -478,17 +474,6 @@ export default function ChannelsPage() {
                     className="font-mono text-sm resize-none"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>有效天数</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="365"
-                    value={expireDays}
-                    onChange={(e) => setExpireDays(e.target.value)}
-                    className="w-32"
-                  />
-                </div>
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription>
@@ -506,15 +491,6 @@ export default function ChannelsPage() {
               </>
             ) : (
               <>
-                <div className="space-y-2">
-                  <Label>登录接口 URL</Label>
-                  <Input
-                    placeholder="https://example.com/api/login"
-                    value={loginUrl}
-                    onChange={(e) => setLoginUrl(e.target.value)}
-                    className="font-mono text-sm"
-                  />
-                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label>用户名</Label>
