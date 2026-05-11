@@ -396,7 +396,7 @@ export default function ChannelsPage() {
 
       {/* Cookie 配置对话框 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
@@ -429,7 +429,7 @@ export default function ChannelsPage() {
                   </div>
                 )}
                 {cookieDetail.cookie_preview && (
-                  <div className="font-mono text-xs text-muted-foreground">
+                  <div className="font-mono text-xs text-muted-foreground break-all">
                     {cookieDetail.cookie_preview}
                   </div>
                 )}
