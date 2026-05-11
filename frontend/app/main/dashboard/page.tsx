@@ -64,8 +64,8 @@ export default function DashboardPage() {
           apiFetch("/user/channels"),
           apiFetch("/user/api-keys")
         ]);
-        if (channelsRes.status === "fulfilled") setChannelCount(channelsRes.value.length);
-        if (apiKeysRes.status === "fulfilled") setApiKeyCount(apiKeysRes.value.length);
+        if (channelsRes.status === "fulfilled") setChannelCount(channelsRes.value.total ?? 0);
+        if (apiKeysRes.status === "fulfilled") setApiKeyCount(Array.isArray(apiKeysRes.value) ? apiKeysRes.value.length : (apiKeysRes.value.total ?? 0));
 
         if (user?.role === "admin") {
           const [usersRes, channelsRes, healthRes] = await Promise.allSettled([
