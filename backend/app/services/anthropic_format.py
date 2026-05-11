@@ -53,7 +53,7 @@ def _extract_assistant_blocks(content: list) -> tuple[list[str], list[dict], str
                 "type": "function",
                 "function": {
                     "name": part["name"],
-                    "arguments": json.dumps(part.get("input", {}), ensure_ascii=False),
+                    "arguments": json.dumps(part.get("input") or {}, ensure_ascii=False),
                 },
             })
         elif ptype == "thinking":
@@ -108,7 +108,7 @@ def convert_anthropic_request_to_openai(anthropic_req: dict) -> dict:
             system = "\n".join(text_parts)
         messages.append({"role": "system", "content": system})
 
-    raw_messages = anthropic_req.get("messages", [])
+    raw_messages = anthropic_req.get("messages") or []
     i = 0
     while i < len(raw_messages):
         msg = raw_messages[i]
@@ -186,7 +186,7 @@ def convert_anthropic_request_to_openai(anthropic_req: dict) -> dict:
                 "function": {
                     "name": tool["name"],
                     "description": tool.get("description", ""),
-                    "parameters": _sanitize_schema(tool.get("input_schema", {})),
+                    "parameters": _sanitize_schema(tool.get("input_schema") or {}),
                 },
             })
         openai_req["tools"] = openai_tools
@@ -226,7 +226,7 @@ def convert_openai_response_to_anthropic(openai_resp: dict, model: str = "") -> 
 
     if "choices" in openai_resp and len(openai_resp["choices"]) > 0:
         choice = openai_resp["choices"][0]
-        message = choice.get("message", choice.get("delta", {}))
+        message = choice.get("message") or choice.get("delta") or {}
 
         # thinking / reasoning_content
         reasoning = message.get("reasoning_content")
@@ -239,12 +239,12 @@ def convert_openai_response_to_anthropic(openai_resp: dict, model: str = "") -> 
             content_blocks.append({"type": "text", "text": text})
 
         # tool_calls
-        tool_calls = message.get("tool_calls", [])
+        tool_calls = message.get("tool_calls") or []
         for tc in tool_calls:
-            func = tc.get("function", {})
+            func = tc.get("function") or {}
             # 解析 arguments JSON
             try:
-                args = json.loads(func.get("arguments", "{}"))
+                args = json.loads(func.get("arguments") or "{}")
             except json.JSONDecodeError:
                 args = {}
             content_blocks.append({
@@ -310,7 +310,7 @@ def convert_openai_chunk_to_anthropic(openai_chunk: dict, model: str = "", state
         return events
 
     choice = openai_chunk["choices"][0]
-    delta = choice.get("delta", {})
+    delta = choice.get("delta") or {}
     chunk_id = openai_chunk.get("id", f"msg_{uuid.uuid4().hex[:24]}").replace("chatcmpl-", "msg_")
     chunk_model = model or openai_chunk.get("model", "")
 
@@ -386,7 +386,7 @@ def convert_openai_chunk_to_anthropic(openai_chunk: dict, model: str = "", state
 
     # --- tool_calls delta ---
     tool_index_offset = (1 if state.get("thinking_started") else 0) + 1  # thinking + text
-    for tc in delta.get("tool_calls", []):
+    for tc in (delta.get("tool_calls") or []):
         tc_index = tc.get("index", 0)
         anthropic_index = tc_index + tool_index_offset
 
@@ -394,7 +394,7 @@ def convert_openai_chunk_to_anthropic(openai_chunk: dict, model: str = "", state
         if anthropic_index > state.get("max_tool_index", 0):
             state["max_tool_index"] = anthropic_index
 
-        func = tc.get("function", {})
+        func = tc.get("function") or {}
 
         # 首个 tool chunk 有 id 和 name → 发 content_block_start
         if tc.get("id"):

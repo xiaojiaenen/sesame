@@ -434,7 +434,7 @@ def _to_openai_format(data: dict, model: str) -> dict:
         data.get("content")
         or data.get("text")
         or data.get("response")
-        or data.get("message", {}).get("content")
+        or (data.get("message") or {}).get("content")
         or data.get("result")
         or data.get("output")
         or ""
@@ -478,9 +478,9 @@ def _convert_sse_line(line: str, chunk_id: str, model: str, created: int) -> str
     content = (
         data.get("content")
         or data.get("text")
-        or data.get("delta", {}).get("content")
-        or data.get("token", {}).get("text")
-        or data.get("message", {}).get("content")
+        or (data.get("delta") or {}).get("content")
+        or (data.get("token") or {}).get("text")
+        or (data.get("message") or {}).get("content")
         or data.get("response")
         or data.get("output")
         or ""
