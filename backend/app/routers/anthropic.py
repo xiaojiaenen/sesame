@@ -1,7 +1,10 @@
 """Anthropic 兼容 API 路由 - 提供 /v1/messages 端点"""
 
 import json
+import logging
 import time
+
+logger = logging.getLogger("sesame.anthropic")
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -155,6 +158,20 @@ async def anthropic_messages(
                 user_id=auth.user_id,
             )
 
+            # 后端返回了 JSON 而非 SSE（如模型不支持流式）
+            if isinstance(result, dict):
+                anthropic_resp = convert_openai_response_to_anthropic(result, external_model)
+                usage = result.get("usage", {})
+                tokens_prompt = usage.get("prompt_tokens", 0)
+                tokens_completion = usage.get("completion_tokens", 0)
+                duration_ms = int((time.monotonic() - start) * 1000)
+                await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 200, tokens_prompt, tokens_completion)
+                await broadcast_request_event(
+                    event_type="request_end", user_id=auth.user_id, model=external_model,
+                    latency_ms=duration_ms, status_code=200, is_stream=False,
+                )
+                return JSONResponse(content=anthropic_resp, headers={"anthropic-version": "2023-06-01"})
+
             # 包装流式响应以转换格式
             _stream_start = time.monotonic()
             _tokens_prompt = 0
@@ -167,6 +184,7 @@ async def anthropic_messages(
                 nonlocal _tokens_prompt, _tokens_completion, _sent_message_start, _sent_finish
 
                 # 处理 OpenAI 流式响应
+                logger.info(f"[ANTHROPIC] Streaming started, result type: {type(result).__name__}")
                 async for line in result.body_iterator:
                     line_str = line.decode("utf-8") if isinstance(line, bytes) else line
 
