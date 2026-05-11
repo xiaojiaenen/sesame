@@ -185,8 +185,12 @@ async def anthropic_messages(
 
                 # 处理 OpenAI 流式响应
                 logger.info(f"[ANTHROPIC] Streaming started, result type: {type(result).__name__}")
+                _line_count = 0
                 async for line in result.body_iterator:
                     line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+                    _line_count += 1
+                    if _line_count <= 5:
+                        logger.info(f"[ANTHROPIC] Raw line {_line_count}: {line_str[:200]}")
 
                     # 解析 SSE 数据
                     if line_str.startswith("data: "):
@@ -202,6 +206,8 @@ async def anthropic_messages(
                                 _tokens_prompt = usage.get("prompt_tokens", 0) or _tokens_prompt
                                 _tokens_completion = usage.get("completion_tokens", 0) or _tokens_completion
                             events = convert_openai_chunk_to_anthropic(openai_chunk, external_model, _stream_state)
+                            if _line_count <= 5:
+                                logger.info(f"[ANTHROPIC] Converted {len(events)} events: {[e['event'] for e in events] if events else 'empty'}")
 
                             # 如果转换函数没有发出 message_start（首 chunk 无 role），补发
                             if not _sent_message_start:
