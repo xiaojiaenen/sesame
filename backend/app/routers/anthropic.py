@@ -170,7 +170,7 @@ async def anthropic_messages(
                     event_type="request_end", user_id=auth.user_id, model=external_model,
                     latency_ms=duration_ms, status_code=200, is_stream=False,
                 )
-                return JSONResponse(content=anthropic_resp, headers={"anthropic-version": "2023-06-01"})
+                return JSONResponse(content=anthropic_resp, headers={"anthropic-version": "2023-06-01", "anthropic-beta": "extended-thinking-2025-01-24"})
 
             # 包装流式响应以转换格式
             _stream_start = time.monotonic()
@@ -251,14 +251,22 @@ async def anthropic_messages(
                 # 如果后端没给 finish_reason，补发结束事件
                 if not _sent_finish:
                     max_tool_idx = _stream_state.get("max_tool_index", 0)
-                    # 停止 text block
-                    if _stream_state.get("text_started"):
+                    # 停止 thinking block（如果还没停过）
+                    if _stream_state.get("thinking_started") and not _stream_state.get("thinking_stopped"):
                         yield format_sse_event("content_block_stop", {
                             "type": "content_block_stop",
                             "index": 0,
                         })
+                    # 停止 text block
+                    if _stream_state.get("text_started"):
+                        text_idx = 1 if _stream_state.get("thinking_started") else 0
+                        yield format_sse_event("content_block_stop", {
+                            "type": "content_block_stop",
+                            "index": text_idx,
+                        })
                     # 停止 tool blocks
-                    for i in range(1, max_tool_idx + 1):
+                    _tool_start = (1 if _stream_state.get("thinking_started") else 0) + 1
+                    for i in range(_tool_start, max_tool_idx + 1):
                         yield format_sse_event("content_block_stop", {
                             "type": "content_block_stop",
                             "index": i,
@@ -287,6 +295,7 @@ async def anthropic_messages(
                     "Cache-Control": "no-cache",
                     "X-Accel-Buffering": "no",
                     "anthropic-version": "2023-06-01",
+                    "anthropic-beta": "extended-thinking-2025-01-24",
                 },
             )
         else:
@@ -319,7 +328,7 @@ async def anthropic_messages(
                 if auth.key_id:
                     asyncio.create_task(_update_key_last_used(auth.key_id))
 
-                return JSONResponse(content=anthropic_resp, headers={"anthropic-version": "2023-06-01"})
+                return JSONResponse(content=anthropic_resp, headers={"anthropic-version": "2023-06-01", "anthropic-beta": "extended-thinking-2025-01-24"})
             else:
                 return result
 
