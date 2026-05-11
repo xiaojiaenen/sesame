@@ -312,7 +312,7 @@ def convert_openai_chunk_to_anthropic(openai_chunk: dict, model: str = "", state
     chunk_model = model or openai_chunk.get("model", "")
 
     # --- 第一个 chunk (带 role) ---
-    if "role" in delta:
+    if delta.get("role"):
         events.append({
             "event": "message_start",
             "data": {
