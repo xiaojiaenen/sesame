@@ -151,6 +151,7 @@ export default function ApiKeysPage() {
                   </TableHead>
                   <TableHead className="font-semibold text-foreground">前缀</TableHead>
                   <TableHead className="font-semibold text-foreground">QPM</TableHead>
+                  <TableHead className="font-semibold text-foreground">过期时间</TableHead>
                   <TableHead className="font-semibold text-foreground">状态</TableHead>
                   <TableHead className="font-semibold text-foreground text-right">操作</TableHead>
                 </TableRow>
@@ -162,13 +163,14 @@ export default function ApiKeysPage() {
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-12" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-28" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     </TableRow>
                   ))
                 ) : keys.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5}>
+                    <TableCell colSpan={6}>
                       <EmptyState
                         icon={<Key className="w-8 h-8 text-muted-foreground" />}
                         title="还没有创建任何 Key"
@@ -211,6 +213,15 @@ export default function ApiKeysPage() {
                           <span className="font-mono text-sm">{k.max_qpm}</span>
                           <span className="text-xs text-muted-foreground">/分</span>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {k.expire_at ? (
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(k.expire_at).toLocaleString("zh-CN")}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">永久</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge
