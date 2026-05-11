@@ -396,7 +396,7 @@ export default function ChannelsPage() {
 
       {/* Cookie 配置对话框 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-warning/10 flex items-center justify-center">
@@ -412,7 +412,7 @@ export default function ChannelsPage() {
           <div className="space-y-4">
             {/* 当前状态 */}
             {cookieDetail && cookieDetail.status !== "none" && (
-              <div className="p-3 bg-muted rounded-lg space-y-2">
+              <div className="p-3 bg-muted rounded-lg space-y-2 overflow-hidden">
                 <div className="flex items-center gap-2">
                   {cookieDetail.status === "active" ? (
                     <CheckCircle2 className="w-4 h-4 text-success" />

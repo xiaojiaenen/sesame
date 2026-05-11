@@ -1,8 +1,18 @@
 import asyncio
 import logging
+import sys
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+
+# 配置日志输出到 stdout（Docker 可捕获）
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    stream=sys.stdout,
+)
+# 降低 uvicorn access 日志噪音
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
