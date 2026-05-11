@@ -1,13 +1,14 @@
 import hashlib
 import json
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cache import get_cache
 from app.models.db_models import ApiKey
+from app.utils import now_beijing
 
 PREFIX = "sk-sesame-"
 KEY_HASH_PREFIX = "apikey:"
@@ -34,7 +35,7 @@ async def create_api_key(
     full_key, key_hash, key_prefix = generate_key()
     expire_at = None
     if expire_days:
-        expire_at = datetime.now(timezone.utc) + timedelta(days=expire_days)
+        expire_at = now_beijing() + timedelta(days=expire_days)
 
     api_key = ApiKey(
         key_hash=key_hash,
@@ -111,7 +112,7 @@ async def validate_key(token: str) -> dict | None:
     if not data:
         return None
 
-    if data.get("expire_ts") and datetime.now(timezone.utc).timestamp() > data["expire_ts"]:
+    if data.get("expire_ts") and now_beijing().timestamp() > data["expire_ts"]:
         await cache.delete(f"{KEY_HASH_PREFIX}{key_hash}")
         return None
 
@@ -135,7 +136,7 @@ async def reveal_key(db: AsyncSession, key_id: int, user_id: str) -> str | None:
 
 async def update_last_used(db: AsyncSession, key_id: int):
     await db.execute(
-        update(ApiKey).where(ApiKey.id == key_id).values(last_used_at=datetime.now(timezone.utc))
+        update(ApiKey).where(ApiKey.id == key_id).values(last_used_at=now_beijing())
     )
     await db.commit()
 
