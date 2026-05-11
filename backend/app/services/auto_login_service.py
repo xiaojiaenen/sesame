@@ -1,74 +1,135 @@
 """自动登录服务 - 基于 Playwright 浏览器自动化"""
 
 import asyncio
+import logging
+from datetime import datetime
 from typing import Optional
 
 from playwright.async_api import async_playwright
+
+logger = logging.getLogger("sesame.auto_login")
+
+MAX_RETRIES = 2
+GOTO_TIMEOUT = 60000
+IDLE_TIMEOUT = 30000
 
 
 async def login_with_credentials(
     login_url: str,
     username: str,
     password: str,
-) -> tuple[bool, str, Optional[str]]:
+) -> tuple[bool, str, Optional[str], Optional[datetime]]:
     """
     使用 Playwright 打开浏览器，自动填写账号密码登录，提取 Cookie。
 
     Returns:
-        (success, message, cookie_string)
+        (success, message, cookie_string, earliest_expire)
     """
-    try:
-        import os
-        async with async_playwright() as p:
-            chrome_path = os.environ.get("PLAYWRIGHT_CHROMIUM_PATH")
-            launch_opts = {"headless": True}
-            if chrome_path and os.path.exists(chrome_path):
-                launch_opts["executable_path"] = chrome_path
-            browser = await p.chromium.launch(**launch_opts)
-            context = await browser.new_context()
-            page = await context.new_page()
+    last_error = ""
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            success, msg, cookie, expire = await _do_login(login_url, username, password)
+            if success:
+                return True, msg, cookie, expire
+            last_error = msg
+            # 表单识别失败不需要重试
+            if "未找到" in msg:
+                return False, msg, None, None
+            if attempt < MAX_RETRIES:
+                logger.info(f"Auto login attempt {attempt} failed: {msg}, retrying...")
+                await asyncio.sleep(2)
+        except Exception as e:
+            last_error = _friendly_error(e)
+            logger.warning(f"Auto login attempt {attempt} error: {type(e).__name__}")
+            if attempt < MAX_RETRIES:
+                await asyncio.sleep(2)
 
-            await page.goto(login_url, wait_until="networkidle", timeout=30000)
+    return False, last_error, None, None
 
-            # 自动识别用户名输入框
-            username_input = await _find_username_input(page)
-            if not username_input:
-                await browser.close()
-                return False, "未找到用户名输入框", None
 
-            # 自动识别密码输入框
-            password_input = await page.query_selector('input[type="password"]')
-            if not password_input:
-                await browser.close()
-                return False, "未找到密码输入框", None
+async def _do_login(
+    login_url: str,
+    username: str,
+    password: str,
+) -> tuple[bool, str, Optional[str], Optional[datetime]]:
+    """单次登录尝试"""
+    import os
+    async with async_playwright() as p:
+        chrome_path = os.environ.get("PLAYWRIGHT_CHROMIUM_PATH")
+        launch_opts = {"headless": True}
+        if chrome_path and os.path.exists(chrome_path):
+            launch_opts["executable_path"] = chrome_path
+        browser = await p.chromium.launch(**launch_opts)
+        context = await browser.new_context()
+        page = await context.new_page()
 
-            # 填写表单
-            await username_input.fill(username)
-            await password_input.fill(password)
+        await page.goto(login_url, wait_until="networkidle", timeout=GOTO_TIMEOUT)
 
-            # 提交：优先找提交按钮，否则回车
-            submit_btn = await _find_submit_button(page)
-            if submit_btn:
-                await submit_btn.click()
-            else:
-                await password_input.press("Enter")
-
-            # 等待导航完成
-            await page.wait_for_load_state("networkidle", timeout=15000)
-            await asyncio.sleep(1)  # 等待 JS 设置 cookie
-
-            # 提取所有 cookie
-            cookies = await context.cookies()
+        # 自动识别用户名输入框
+        username_input = await _find_username_input(page)
+        if not username_input:
             await browser.close()
+            return False, "未找到用户名输入框，请检查登录地址是否正确", None, None
 
-            if not cookies:
-                return False, "登录成功但未获取到 Cookie", None
+        # 自动识别密码输入框
+        password_input = await page.query_selector('input[type="password"]')
+        if not password_input:
+            await browser.close()
+            return False, "未找到密码输入框，请检查登录地址是否正确", None, None
 
-            cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in cookies)
-            return True, "登录成功", cookie_str
+        # 填写表单
+        await username_input.fill(username)
+        await password_input.fill(password)
 
-    except Exception as e:
-        return False, f"登录失败: {str(e)}", None
+        # 提交：优先找提交按钮，否则回车
+        submit_btn = await _find_submit_button(page)
+        if submit_btn:
+            await submit_btn.click()
+        else:
+            await password_input.press("Enter")
+
+        # 等待导航完成
+        await page.wait_for_load_state("networkidle", timeout=IDLE_TIMEOUT)
+        await asyncio.sleep(1)  # 等待 JS 设置 cookie
+
+        # 提取所有 cookie
+        cookies = await context.cookies()
+        await browser.close()
+
+        if not cookies:
+            return False, "登录成功但未获取到 Cookie，请检查账号密码是否正确", None, None
+
+        cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in cookies)
+
+        # 取最早的 cookie 过期时间作为真实有效期（转为北京时间，去掉时区信息）
+        from app.utils import now_beijing, BEIJING_TZ
+        earliest = None
+        for c in cookies:
+            exp = c.get("expires", -1)
+            if exp and exp > 0:
+                dt = datetime.fromtimestamp(exp, tz=BEIJING_TZ).replace(tzinfo=None)
+                if earliest is None or dt < earliest:
+                    earliest = dt
+
+        return True, "登录成功", cookie_str, earliest
+
+
+def _friendly_error(e: Exception) -> str:
+    """将 Playwright 异常转换为用户友好的错误信息"""
+    err_str = str(e).lower()
+    if "timeout" in err_str or "timed out" in err_str:
+        return "登录超时，请检查网络连接或登录地址是否正确"
+    if "net::err_name_not_resolved" in err_str:
+        return "无法访问登录地址，请检查网址是否正确"
+    if "net::err_connection_refused" in err_str:
+        return "连接被拒绝，请检查登录地址是否可用"
+    if "net::err_connection_timed_out" in err_str:
+        return "连接超时，请检查网络连接"
+    if "navigation failed" in err_str:
+        return "页面加载失败，请检查登录地址是否正确"
+    if "browser" in err_str and "launch" in err_str:
+        return "浏览器启动失败，请联系管理员"
+    return "登录失败，请稍后重试"
 
 
 async def _find_username_input(page):

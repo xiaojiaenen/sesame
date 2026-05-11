@@ -176,6 +176,9 @@ async def get_channel_cookie(
         "status": "expired" if expired else ucc.status,
         "expire_at": ucc.expire_at.isoformat() if ucc.expire_at else None,
         "cookie_preview": preview,
+        "login_url": ucc.login_url or "",
+        "username": ucc.username or "",
+        "auto_refresh": ucc.auto_refresh or False,
     }
 
 
@@ -221,7 +224,7 @@ async def auto_login_channel(
     if not login_url:
         raise HTTPException(status_code=400, detail="未配置登录地址，请在渠道中设置 Base URL")
 
-    success, msg, cookie = await login_with_credentials(
+    success, msg, cookie, real_expire = await login_with_credentials(
         login_url=login_url,
         username=req.username,
         password=req.password,
@@ -229,8 +232,8 @@ async def auto_login_channel(
     if not success:
         raise HTTPException(status_code=400, detail=msg)
 
-    # 保存 cookie + 登录凭证
-    expire_at = now_beijing() + timedelta(days=7)
+    # 保存 cookie + 登录凭证，使用真实过期时间（无则默认 7 天）
+    expire_at = real_expire if real_expire else now_beijing() + timedelta(days=7)
     encrypted = encrypt(cookie)
     password_enc = encrypt(req.password)
 

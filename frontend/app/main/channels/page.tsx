@@ -123,6 +123,14 @@ export default function ChannelsPage() {
     try {
       const detail = await apiFetch(`/user/channels/${ch.id}/cookie`);
       setCookieDetail(detail);
+      // Pre-fill auto-login fields from saved data
+      if (detail.username) {
+        setLoginUser(detail.username);
+        setLoginMode("auto");
+      }
+      if (detail.auto_refresh) {
+        setAutoRefresh(detail.auto_refresh);
+      }
     } catch {
       setCookieDetail(null);
     }

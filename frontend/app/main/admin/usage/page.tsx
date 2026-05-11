@@ -47,6 +47,13 @@ interface UserStats {
   avg_latency_ms: number;
 }
 
+function formatTokens(n: number): string {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2).replace(/\.?0+$/, '') + 'B';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return String(n);
+}
+
 const COLORS = [
   '#10b981', // emerald
   '#3b82f6', // blue
@@ -195,7 +202,7 @@ export default function UsagePage() {
       {/* Summary */}
       <div className="grid gap-4 md:grid-cols-4">
         <motion.div {...fadeInUp}><SummaryCard icon={TrendingUp} label="总请求数" value={totalRequests.toLocaleString()} loading={loading} /></motion.div>
-        <motion.div {...fadeInUp}><SummaryCard icon={BarChart3} label="总 Token" value={`${(totalTokens / 1000).toFixed(1)}K`} loading={loading} /></motion.div>
+        <motion.div {...fadeInUp}><SummaryCard icon={BarChart3} label="总 Token" value={formatTokens(totalTokens)} loading={loading} /></motion.div>
         <motion.div {...fadeInUp}><SummaryCard icon={Clock} label="平均延迟" value={`${avgLatency}ms`} loading={loading} color="warning" /></motion.div>
         <motion.div {...fadeInUp}><SummaryCard icon={Zap} label="错误数" value={String(totalErrors)} loading={loading} color={totalErrors > 0 ? "destructive" : "success"} /></motion.div>
       </div>
@@ -337,7 +344,7 @@ export default function UsagePage() {
                         return (
                           <div className="bg-popover/95 backdrop-blur-sm border border-border/60 rounded-xl p-3 shadow-xl">
                             <p className="text-xs font-semibold mb-1">{d.fullName}</p>
-                            <p className="text-xs text-muted-foreground">Token: {(d.tokens / 1000).toFixed(1)}K</p>
+                            <p className="text-xs text-muted-foreground">Token: {formatTokens(d.tokens)}</p>
                             <p className="text-xs text-muted-foreground">请求: {d.requests}</p>
                           </div>
                         );
@@ -388,7 +395,7 @@ export default function UsagePage() {
                       return (
                         <div className="bg-popover/95 backdrop-blur-sm border border-border/60 rounded-xl p-3 shadow-xl">
                           <p className="text-xs font-semibold mb-1">{d.name}</p>
-                          <p className="text-xs text-muted-foreground">Token: {(d.tokens / 1000).toFixed(1)}K</p>
+                          <p className="text-xs text-muted-foreground">Token: {formatTokens(d.tokens)}</p>
                           <p className="text-xs text-muted-foreground">请求: {d.requests}</p>
                         </div>
                       );
