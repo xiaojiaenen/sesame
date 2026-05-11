@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker pull *)",
+      "Bash(docker run *)",
+      "Bash(docker commit *)",
+      "Bash(docker rm *)",
+      "Bash(docker save *)",
+      "Bash(python -c \"from app.main import app; print\\('import ok'\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import app.config; print\\('config ok'\\)\")",
+      "Bash(py --version)",
+      "Bash(uv run *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}

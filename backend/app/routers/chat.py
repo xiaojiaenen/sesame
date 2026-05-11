@@ -58,13 +58,6 @@ async def _proxy_request(request: Request, auth: AuthUser):
     external_model = body.get("model", "")
     stream = body.get("stream", False)
 
-    # Model permission
-    if auth.allowed_models and external_model not in auth.allowed_models:
-        return JSONResponse(
-            status_code=403,
-            content={"error": {"message": f"API Key 无权使用模型: {external_model}", "type": "sesame_error"}},
-        )
-
     # 检查用户偏好：是否使用指定渠道
     preferred_channel_id = None
     async with async_session() as db:
@@ -208,6 +201,7 @@ async def _log_request(user_id, key_id, external_model, stream, status_code, dur
                 latency_ms=duration_ms,
                 status_code=status_code,
                 is_stream=stream,
+                api_format="openai",
             )
     except Exception as e:
         import logging

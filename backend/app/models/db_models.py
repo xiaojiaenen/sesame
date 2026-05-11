@@ -162,6 +162,7 @@ class RequestLog(Base):
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     status_code: Mapped[int | None] = mapped_column(Integer)
     is_stream: Mapped[bool] = mapped_column(Boolean, default=False)
+    api_format: Mapped[str | None] = mapped_column(String(16))  # "openai" / "anthropic"
     error_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_beijing)
 

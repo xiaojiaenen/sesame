@@ -21,6 +21,7 @@ async def log_request(
     latency_ms: int | None = None,
     status_code: int | None = None,
     is_stream: bool = False,
+    api_format: str | None = None,
     error_message: str | None = None,
 ) -> None:
     """记录请求日志并使用原子 SQL 更新用量统计"""
@@ -35,6 +36,7 @@ async def log_request(
         latency_ms=latency_ms,
         status_code=status_code,
         is_stream=is_stream,
+        api_format=api_format,
         error_message=error_message,
     )
     db.add(log)

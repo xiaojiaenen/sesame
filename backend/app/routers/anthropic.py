@@ -68,7 +68,6 @@ async def anthropic_messages(
     auth = AuthUser(
         user_id=key_info["user_id"],
         key_id=key_info["key_id"],
-        allowed_models=key_info["allowed_models"] or None,
         max_qpm=key_info["max_qpm"],
     )
 
@@ -103,19 +102,6 @@ async def anthropic_messages(
     # 提取模型
     external_model = anthropic_req.get("model", "")
     stream = anthropic_req.get("stream", False)
-
-    # Model permission
-    if auth.allowed_models and external_model not in auth.allowed_models:
-        return JSONResponse(
-            status_code=403,
-            content={
-                "type": "error",
-                "error": {
-                    "type": "permission_error",
-                    "message": f"API Key 无权使用模型: {external_model}"
-                }
-            },
-        )
 
     # 检查是否有可用渠道
     channel, _ = channel_service.select_channel(external_model)
@@ -380,6 +366,7 @@ async def _log_request(user_id: str, key_id: int | None, model: str, duration_ms
                 latency_ms=duration_ms,
                 status_code=status_code,
                 is_stream=is_stream,
+                api_format="anthropic",
             )
     except Exception:
         pass

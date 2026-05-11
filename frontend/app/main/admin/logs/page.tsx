@@ -28,6 +28,7 @@ interface RequestLog {
   latency_ms: number | null;
   status_code: number | null;
   is_stream: boolean;
+  api_format: string | null;
   error_message: string | null;
   created_at: string | null;
 }
@@ -127,6 +128,7 @@ export default function LogsPage() {
                   <TableHead className="font-semibold text-foreground">实际模型</TableHead>
                   <TableHead className="font-semibold text-foreground">Token 消耗</TableHead>
                   <TableHead className="font-semibold text-foreground">延迟</TableHead>
+                  <TableHead className="font-semibold text-foreground">格式</TableHead>
                   <TableHead className="font-semibold text-foreground">状态</TableHead>
                   <TableHead className="font-semibold text-foreground">类型</TableHead>
                 </TableRow>
@@ -142,12 +144,13 @@ export default function LogsPage() {
                       <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                     </TableRow>
                   ))
                 ) : logs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8}>
+                    <TableCell colSpan={9}>
                       <EmptyState
                         icon={<FileText className="w-8 h-8 text-muted-foreground" />}
                         title="暂无请求日志"
@@ -189,6 +192,11 @@ export default function LogsPage() {
                         <span className={`text-sm ${log.latency_ms && log.latency_ms > 5000 ? 'text-destructive' : ''}`}>
                           {log.latency_ms ? `${log.latency_ms}ms` : "-"}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[11px]">
+                          {log.api_format === "anthropic" ? "Anthropic" : log.api_format === "openai" ? "OpenAI" : "-"}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <Badge variant={log.status_code && log.status_code < 400 ? "default" : "destructive"}>

@@ -14,7 +14,6 @@ class AuthUser:
     user_id: str
     role: str = "user"
     key_id: int | None = None
-    allowed_models: list[str] | None = None
     max_qpm: int = 60
 
 
@@ -34,7 +33,6 @@ async def get_api_key_user(
         return AuthUser(
             user_id=key_info["user_id"],
             key_id=key_info["key_id"],
-            allowed_models=key_info["allowed_models"] or None,
             max_qpm=key_info["max_qpm"],
         )
 

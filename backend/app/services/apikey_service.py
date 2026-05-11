@@ -26,7 +26,6 @@ async def create_api_key(
     db: AsyncSession,
     user_id: str,
     name: str | None,
-    allowed_models: list[str] | None,
     max_qpm: int,
     expire_days: int | None,
 ) -> tuple[str, ApiKey]:
@@ -43,7 +42,6 @@ async def create_api_key(
         key_prefix=key_prefix,
         name=name,
         user_id=user_id,
-        allowed_models=",".join(allowed_models) if allowed_models else None,
         max_qpm=max_qpm,
         is_active=True,
         expire_at=expire_at,
@@ -84,8 +82,6 @@ async def update_api_key(db: AsyncSession, key_id: int, user_id: str | None, **k
     values = {k: v for k, v in kwargs.items() if v is not None}
     if not values:
         return True
-    if "allowed_models" in values and isinstance(values["allowed_models"], list):
-        values["allowed_models"] = ",".join(values["allowed_models"])
     await db.execute(q.values(**values))
     await db.commit()
     await _invalidate_cache(key_id)
@@ -168,11 +164,9 @@ async def load_keys_to_cache(db: AsyncSession):
 async def _cache_key(key: ApiKey):
     cache = get_cache()
     expire_ts = key.expire_at.timestamp() if key.expire_at else None
-    models = key.allowed_models.split(",") if key.allowed_models else []
     data = {
         "key_id": key.id,
         "user_id": key.user_id,
-        "allowed_models": models,
         "max_qpm": key.max_qpm,
         "expire_ts": expire_ts,
     }

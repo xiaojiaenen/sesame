@@ -108,7 +108,6 @@ class UserInfo(BaseModel):
 
 class ApiKeyCreate(BaseModel):
     name: str | None = None
-    allowed_models: list[str] | None = None
     max_qpm: int = Field(default=60, ge=1, le=10000)
     expire_days: int | None = None
 
@@ -117,7 +116,6 @@ class ApiKeyResponse(BaseModel):
     id: int
     key_prefix: str
     name: str | None
-    allowed_models: list[str] | None
     max_qpm: int
     is_active: bool
     expire_at: str | None
@@ -131,7 +129,6 @@ class ApiKeyCreated(ApiKeyResponse):
 
 class ApiKeyUpdate(BaseModel):
     name: str | None = None
-    allowed_models: list[str] | None = None
     max_qpm: int | None = Field(default=None, ge=1, le=10000)
     is_active: bool | None = None
 

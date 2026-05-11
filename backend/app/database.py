@@ -44,3 +44,9 @@ async def init_db():
             await conn.execute(text("ALTER TABLE api_keys MODIFY COLUMN key_prefix VARCHAR(20) NOT NULL"))
         except Exception:
             pass
+
+        # v1.4 请求日志添加 api_format 列
+        try:
+            await conn.execute(text("ALTER TABLE request_logs ADD COLUMN api_format VARCHAR(16) DEFAULT NULL"))
+        except Exception:
+            pass

@@ -283,7 +283,6 @@ async def create_key(
         db,
         user_id=auth.user_id,
         name=req.name,
-        allowed_models=req.allowed_models,
         max_qpm=req.max_qpm,
         expire_days=req.expire_days,
     )
@@ -291,7 +290,6 @@ async def create_key(
         id=api_key.id,
         key_prefix=api_key.key_prefix,
         name=api_key.name,
-        allowed_models=req.allowed_models,
         max_qpm=api_key.max_qpm,
         is_active=api_key.is_active,
         expire_at=api_key.expire_at.isoformat() if api_key.expire_at else None,
@@ -312,7 +310,6 @@ async def list_keys(
             id=k.id,
             key_prefix=k.key_prefix,
             name=k.name,
-            allowed_models=k.allowed_models.split(",") if k.allowed_models else None,
             max_qpm=k.max_qpm,
             is_active=k.is_active,
             expire_at=k.expire_at.isoformat() if k.expire_at else None,

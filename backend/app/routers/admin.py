@@ -84,7 +84,6 @@ async def list_all_keys(
                 "key_prefix": k.key_prefix,
                 "name": k.name,
                 "user_id": k.user_id,
-                "allowed_models": k.allowed_models.split(",") if k.allowed_models else None,
                 "max_qpm": k.max_qpm,
                 "is_active": k.is_active,
                 "expire_at": k.expire_at.isoformat() if k.expire_at else None,
@@ -317,6 +316,7 @@ async def list_logs(
                 "latency_ms": l.latency_ms,
                 "status_code": l.status_code,
                 "is_stream": l.is_stream,
+                "api_format": l.api_format,
                 "error_message": l.error_message,
                 "created_at": l.created_at.isoformat() if l.created_at else None,
             }

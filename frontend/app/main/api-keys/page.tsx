@@ -10,7 +10,6 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "motion/react";
@@ -24,13 +23,11 @@ import {
 
 export default function ApiKeysPage() {
   const [keys, setKeys] = useState<any[]>([]);
-  const [channels, setChannels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Create state
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
-  const [newModels, setNewModels] = useState<string[]>([]);
   const [newQpm, setNewQpm] = useState("60");
   const [newExpire, setNewExpire] = useState("");
   const [createdKey, setCreatedKey] = useState("");
@@ -39,12 +36,8 @@ export default function ApiKeysPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [keysData, channelsData] = await Promise.all([
-        apiFetch("/user/api-keys"),
-        apiFetch("/user/channels"),
-      ]);
+      const keysData = await apiFetch("/user/api-keys");
       setKeys(Array.isArray(keysData) ? keysData : []);
-      setChannels(Array.isArray(channelsData) ? channelsData : []);
     } catch (error) {
       toast.error("加载数据失败");
     } finally {
@@ -62,7 +55,6 @@ export default function ApiKeysPage() {
         method: "POST",
         body: JSON.stringify({
           name: newName || undefined,
-          allowed_models: newModels,
           max_qpm: parseInt(newQpm, 10) || 60,
           expire_days: newExpire ? parseInt(newExpire, 10) : undefined,
         }),
@@ -80,7 +72,6 @@ export default function ApiKeysPage() {
     setCreatedKey("");
     setCopiedKey(false);
     setNewName("");
-    setNewModels([]);
     setNewQpm("60");
     setNewExpire("");
   };
@@ -159,7 +150,6 @@ export default function ApiKeysPage() {
                     </div>
                   </TableHead>
                   <TableHead className="font-semibold text-foreground">前缀</TableHead>
-                  <TableHead className="font-semibold text-foreground">可用模型</TableHead>
                   <TableHead className="font-semibold text-foreground">QPM</TableHead>
                   <TableHead className="font-semibold text-foreground">状态</TableHead>
                   <TableHead className="font-semibold text-foreground text-right">操作</TableHead>
@@ -171,7 +161,6 @@ export default function ApiKeysPage() {
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-36" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-12" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-24" /></TableCell>
@@ -179,7 +168,7 @@ export default function ApiKeysPage() {
                   ))
                 ) : keys.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6}>
+                    <TableCell colSpan={5}>
                       <EmptyState
                         icon={<Key className="w-8 h-8 text-muted-foreground" />}
                         title="还没有创建任何 Key"
@@ -216,26 +205,6 @@ export default function ApiKeysPage() {
                         <code className="px-2 py-1 bg-muted rounded text-xs font-mono text-foreground">
                           {k.key_prefix}
                         </code>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1 max-w-[200px]">
-                          {(!k.allowed_models || k.allowed_models.length === 0) ? (
-                            <Badge variant="secondary" className="text-xs bg-success/10 text-success">
-                              所有权限
-                            </Badge>
-                          ) : (
-                            k.allowed_models.slice(0, 2).map((m: string) => (
-                              <Badge key={m} variant="secondary" className="text-[11px]">
-                                {m}
-                              </Badge>
-                            ))
-                          )}
-                          {k.allowed_models?.length > 2 && (
-                            <Badge variant="secondary" className="text-[11px]">
-                              +{k.allowed_models.length - 2}
-                            </Badge>
-                          )}
-                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
@@ -379,33 +348,6 @@ export default function ApiKeysPage() {
                   placeholder="30"
                   className="bg-muted/30"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label className="text-foreground">允许的渠道 (不选则拥有所有权限)</Label>
-                <div className="max-h-48 overflow-y-auto space-y-2 border border-border p-3 rounded-xl bg-muted/30">
-                  {channels.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">暂无可用渠道</p>
-                  ) : (
-                    channels.map((ch: any) => (
-                      <div key={ch.id} className="flex items-center space-x-2 p-2 hover:bg-white rounded-lg transition-colors">
-                        <Checkbox
-                          id={`channel-${ch.id}`}
-                          checked={newModels.includes(String(ch.id))}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setNewModels([...newModels, String(ch.id)]);
-                            } else {
-                              setNewModels(newModels.filter(x => x !== String(ch.id)));
-                            }
-                          }}
-                        />
-                        <label htmlFor={`channel-${ch.id}`} className="text-sm font-medium leading-none cursor-pointer flex-1">
-                          {ch.name}
-                        </label>
-                      </div>
-                    ))
-                  )}
-                </div>
               </div>
               <DialogFooter className="gap-2">
                 <Button variant="outline" onClick={closeCreate}>取消</Button>
