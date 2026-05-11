@@ -15,6 +15,14 @@ import {
   PieChart, Pie, Cell, LineChart, Line, Legend
 } from "recharts";
 
+interface HourlyStats {
+  hour: string;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  requests: number;
+}
+
 interface DailyStats {
   date: string;
   total_requests: number;
@@ -51,6 +59,7 @@ const COLORS = [
 ];
 
 export default function UsagePage() {
+  const [hourlyStats, setHourlyStats] = useState<HourlyStats[]>([]);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
   const [modelStats, setModelStats] = useState<ModelStats[]>([]);
   const [userStats, setUserStats] = useState<UserStats[]>([]);
@@ -60,11 +69,14 @@ export default function UsagePage() {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const [daily, model, user] = await Promise.all([
+      const hourlyDays = days <= 1 ? 1 : days <= 7 ? days : 7;
+      const [hourly, daily, model, user] = await Promise.all([
+        apiFetch(`/admin/usage/hourly?days=${hourlyDays}`),
         apiFetch(`/admin/usage/daily?days=${days}`),
         apiFetch(`/admin/usage/by-model?days=${days}`),
         apiFetch(`/admin/usage/by-user?days=${days}`),
       ]);
+      setHourlyStats(hourly);
       setDailyStats(daily);
       setModelStats(model);
       setUserStats(user);
@@ -83,6 +95,14 @@ export default function UsagePage() {
   const avgLatency = dailyStats.length > 0
     ? Math.round(dailyStats.reduce((sum, d) => sum + d.avg_latency_ms, 0) / dailyStats.length)
     : 0;
+
+  const hourlyChartData = hourlyStats.map(h => ({
+    hour: h.hour.slice(5),  // "MM-DD HH:00"
+    tokens: Math.round(h.total_tokens / 1000),
+    prompt: Math.round(h.prompt_tokens / 1000),
+    completion: Math.round(h.completion_tokens / 1000),
+    requests: h.requests,
+  }));
 
   const dailyChartData = dailyStats.map(d => ({
     date: d.date.slice(5),
@@ -179,6 +199,45 @@ export default function UsagePage() {
         <motion.div {...fadeInUp}><SummaryCard icon={Clock} label="平均延迟" value={`${avgLatency}ms`} loading={loading} color="warning" /></motion.div>
         <motion.div {...fadeInUp}><SummaryCard icon={Zap} label="错误数" value={String(totalErrors)} loading={loading} color={totalErrors > 0 ? "destructive" : "success"} /></motion.div>
       </div>
+
+      {/* Hourly Token Chart */}
+      <motion.div {...fadeInUp}>
+        <Card className="border-border/50 overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Clock className="w-4 h-4 text-primary" />
+              按小时统计 Token (K)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? <Skeleton className="h-72 w-full" /> : hourlyChartData.length === 0 ? (
+              <div className="h-72 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={288}>
+                <BarChart data={hourlyChartData}>
+                  <defs>
+                    <linearGradient id="gradPrompt" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8} />
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.4} />
+                    </linearGradient>
+                    <linearGradient id="gradCompletion" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.8} />
+                      <stop offset="100%" stopColor="#10b981" stopOpacity={0.4} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="hour" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+                  <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="prompt" name="Prompt (K)" fill="url(#gradPrompt)" stackId="tokens" radius={[0, 0, 0, 0]} />
+                  <Bar dataKey="completion" name="Completion (K)" fill="url(#gradCompletion)" stackId="tokens" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Requests Area Chart */}
       <motion.div {...fadeInUp}>

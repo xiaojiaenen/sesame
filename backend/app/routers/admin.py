@@ -327,6 +327,16 @@ async def list_logs(
 
 # --- Usage Statistics (用量统计) ---
 
+@router.get("/usage/hourly")
+async def get_hourly_usage(
+    days: int = Query(1, le=7),
+    db: AsyncSession = Depends(get_db),
+    _: AuthUser = Depends(get_admin_user),
+):
+    stats = await log_service.get_hourly_stats(db, days)
+    return stats
+
+
 @router.get("/usage/daily")
 async def get_daily_usage(
     days: int = Query(30, le=365),

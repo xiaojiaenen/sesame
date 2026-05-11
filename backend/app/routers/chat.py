@@ -108,6 +108,8 @@ async def _proxy_request(request: Request, auth: AuthUser):
             )
     except proxy_service.BackendAuthError:
         logger.warning(f"[CHAT] BackendAuthError from {url if 'url' in dir() else 'unknown'}")
+        duration_ms = int((time.monotonic() - start) * 1000)
+        await _log_request(auth.user_id, auth.key_id, external_model, stream, 401, duration_ms)
         await broadcast_request_event(
             event_type="request_error",
             user_id=auth.user_id,
@@ -121,6 +123,8 @@ async def _proxy_request(request: Request, auth: AuthUser):
         )
     except proxy_service.BackendError as e:
         logger.error(f"[CHAT] BackendError: {e}")
+        duration_ms = int((time.monotonic() - start) * 1000)
+        await _log_request(auth.user_id, auth.key_id, external_model, stream, 502, duration_ms)
         await broadcast_request_event(
             event_type="request_error",
             user_id=auth.user_id,

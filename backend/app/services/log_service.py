@@ -142,6 +142,34 @@ async def get_logs_count(
     return result.scalar() or 0
 
 
+async def get_hourly_stats(db: AsyncSession, days: int = 1) -> list[dict]:
+    """按小时统计 token 用量（最近 N 天）"""
+    start = now_beijing() - timedelta(days=days)
+    result = await db.execute(
+        select(
+            func.date_format(RequestLog.created_at, "%Y-%m-%d %H:00").label("hour"),
+            func.sum(RequestLog.tokens_prompt + RequestLog.tokens_completion).label("total_tokens"),
+            func.sum(RequestLog.tokens_prompt).label("prompt_tokens"),
+            func.sum(RequestLog.tokens_completion).label("completion_tokens"),
+            func.count().label("requests"),
+        )
+        .where(RequestLog.created_at >= start)
+        .group_by(text("hour"))
+        .order_by(text("hour"))
+    )
+    rows = result.all()
+    return [
+        {
+            "hour": row.hour,
+            "total_tokens": row.total_tokens or 0,
+            "prompt_tokens": row.prompt_tokens or 0,
+            "completion_tokens": row.completion_tokens or 0,
+            "requests": row.requests or 0,
+        }
+        for row in rows
+    ]
+
+
 async def get_daily_stats(db: AsyncSession, days: int = 30) -> list[dict]:
     start_date = (now_beijing() - timedelta(days=days)).strftime("%Y-%m-%d")
 

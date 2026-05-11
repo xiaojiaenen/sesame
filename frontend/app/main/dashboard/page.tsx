@@ -147,8 +147,8 @@ export default function DashboardPage() {
         <StatCard
           icon={Server}
           label="渠道数"
-          value={channelCount ?? 0}
-          loading={loading}
+          value={(user?.role === "admin" ? (adminStats?.channelCount ?? channelCount) : channelCount) ?? 0}
+          loading={loading || (user?.role === "admin" && !adminStats)}
           href="/main/channels"
         />
 

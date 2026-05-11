@@ -319,6 +319,8 @@ async def anthropic_messages(
                 return result
 
     except proxy_service.BackendAuthError:
+        duration_ms = int((time.monotonic() - start) * 1000)
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 401)
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
             status_code=401, error_message="认证失败",
@@ -334,6 +336,8 @@ async def anthropic_messages(
             },
         )
     except proxy_service.BackendError as e:
+        duration_ms = int((time.monotonic() - start) * 1000)
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 502)
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
             status_code=502, error_message=str(e),
