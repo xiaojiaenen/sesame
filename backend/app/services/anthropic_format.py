@@ -228,15 +228,12 @@ def convert_openai_response_to_anthropic(openai_resp: dict, model: str = "") -> 
         choice = openai_resp["choices"][0]
         message = choice.get("message") or choice.get("delta") or {}
 
-        # thinking / reasoning_content
+        # reasoning_content + content → 统一输出为 text
         reasoning = message.get("reasoning_content")
-        if reasoning:
-            content_blocks.append({"type": "thinking", "thinking": reasoning})
-
-        # text content
         text = message.get("content")
-        if text:
-            content_blocks.append({"type": "text", "text": text})
+        final_text = text if text else reasoning
+        if final_text:
+            content_blocks.append({"type": "text", "text": final_text})
 
         # tool_calls
         tool_calls = message.get("tool_calls") or []
@@ -333,45 +330,22 @@ def convert_openai_chunk_to_anthropic(openai_chunk: dict, model: str = "", state
             },
         })
 
-    # --- thinking / reasoning_content delta ---
-    if delta.get("reasoning_content"):
-        if not state.get("thinking_started"):
-            state["thinking_started"] = True
-            state["thinking_index"] = 0
+    # --- thinking / reasoning_content → 当作文本输出 ---
+    # Qwen 等模型的 reasoning_content 是思考链，客户端不一定认 thinking block，
+    # 统一转为 text block
+    reasoning = delta.get("reasoning_content")
+    content = delta.get("content")
+    # 优先用 content，没有则用 reasoning_content
+    text_content = content if content else reasoning
+
+    if text_content:
+        if not state.get("text_started"):
+            state["text_started"] = True
             events.append({
                 "event": "content_block_start",
                 "data": {
                     "type": "content_block_start",
                     "index": 0,
-                    "content_block": {"type": "thinking", "thinking": ""},
-                },
-            })
-        events.append({
-            "event": "content_block_delta",
-            "data": {
-                "type": "content_block_delta",
-                "index": state.get("thinking_index", 0),
-                "delta": {"type": "thinking_delta", "thinking": delta["reasoning_content"]},
-            },
-        })
-
-    # --- text delta ---
-    text_index = 1 if state.get("thinking_started") else 0
-    if delta.get("content"):
-        if not state.get("text_started"):
-            state["text_started"] = True
-            # thinking block 结束后才开始 text block
-            if state.get("thinking_started") and not state.get("thinking_stopped"):
-                state["thinking_stopped"] = True
-                events.append({
-                    "event": "content_block_stop",
-                    "data": {"type": "content_block_stop", "index": 0},
-                })
-            events.append({
-                "event": "content_block_start",
-                "data": {
-                    "type": "content_block_start",
-                    "index": text_index,
                     "content_block": {"type": "text", "text": ""},
                 },
             })
@@ -379,13 +353,13 @@ def convert_openai_chunk_to_anthropic(openai_chunk: dict, model: str = "", state
             "event": "content_block_delta",
             "data": {
                 "type": "content_block_delta",
-                "index": text_index,
-                "delta": {"type": "text_delta", "text": delta["content"]},
+                "index": 0,
+                "delta": {"type": "text_delta", "text": text_content},
             },
         })
 
     # --- tool_calls delta ---
-    tool_index_offset = (1 if state.get("thinking_started") else 0) + 1  # thinking + text
+    tool_index_offset = 1  # text block 之后
     for tc in (delta.get("tool_calls") or []):
         tc_index = tc.get("index", 0)
         anthropic_index = tc_index + tool_index_offset

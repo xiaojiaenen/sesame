@@ -251,22 +251,14 @@ async def anthropic_messages(
                 # 如果后端没给 finish_reason，补发结束事件
                 if not _sent_finish:
                     max_tool_idx = _stream_state.get("max_tool_index", 0)
-                    # 停止 thinking block（如果还没停过）
-                    if _stream_state.get("thinking_started") and not _stream_state.get("thinking_stopped"):
+                    # 停止 text block
+                    if _stream_state.get("text_started"):
                         yield format_sse_event("content_block_stop", {
                             "type": "content_block_stop",
                             "index": 0,
                         })
-                    # 停止 text block
-                    if _stream_state.get("text_started"):
-                        text_idx = 1 if _stream_state.get("thinking_started") else 0
-                        yield format_sse_event("content_block_stop", {
-                            "type": "content_block_stop",
-                            "index": text_idx,
-                        })
                     # 停止 tool blocks
-                    _tool_start = (1 if _stream_state.get("thinking_started") else 0) + 1
-                    for i in range(_tool_start, max_tool_idx + 1):
+                    for i in range(1, max_tool_idx + 1):
                         yield format_sse_event("content_block_stop", {
                             "type": "content_block_stop",
                             "index": i,
