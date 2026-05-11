@@ -83,7 +83,7 @@ async def proxy_request(
 ) -> dict | StreamingResponse:
     """代理请求 - 支持多渠道"""
     client = await get_client()
-    logger.info(f"[PROXY] model={target_model} stream={stream} path={backend_path} user={user_id} channel_id={channel_id}")
+    logger.info(f"[PROXY] model={target_model} stream={stream} user={user_id} channel_id={channel_id}")
 
     # 选择渠道（返回渠道和映射后的后端模型名）
     channel = None
@@ -173,7 +173,7 @@ async def proxy_request_with_retry(
         if not channels:
             # 没有渠道，使用默认方式
             try:
-                return await proxy_request(cookie, raw_body, model, stream, backend_path, user_id=user_id)
+                return await proxy_request(cookie, raw_body, model, stream, user_id=user_id)
             except BackendAuthError:
                 raise
             except Exception as e:
@@ -197,7 +197,7 @@ async def proxy_request_with_retry(
 
             try:
                 return await proxy_request(
-                    cookie, raw_body, model, stream, backend_path,
+                    cookie, raw_body, model, stream,
                     channel_id=channel['id'], user_id=user_id
                 )
             except BackendAuthError:
