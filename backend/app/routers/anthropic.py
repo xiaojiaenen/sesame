@@ -186,55 +186,67 @@ async def anthropic_messages(
                 # 处理 OpenAI 流式响应
                 logger.info(f"[ANTHROPIC] Streaming started, result type: {type(result).__name__}")
                 _line_count = 0
-                async for line in result.body_iterator:
-                    line_str = line.decode("utf-8") if isinstance(line, bytes) else line
-                    _line_count += 1
-                    if _line_count <= 5:
-                        logger.info(f"[ANTHROPIC] Raw line {_line_count}: {line_str[:200]}")
+                _yield_count = 0
+                try:
+                    async for line in result.body_iterator:
+                        line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+                        _line_count += 1
+                        if _line_count <= 5:
+                            logger.info(f"[ANTHROPIC] Raw line {_line_count}: {line_str[:200]}")
 
-                    # 解析 SSE 数据
-                    if line_str.startswith("data: "):
-                        data_str = line_str[6:].strip()
-                        if data_str == "[DONE]":
-                            break
+                        # 解析 SSE 数据
+                        if line_str.startswith("data: "):
+                            data_str = line_str[6:].strip()
+                            if data_str == "[DONE]":
+                                break
 
-                        try:
-                            openai_chunk = json.loads(data_str)
-                            # 提取 token 用量（OpenAI 流式最后一帧可能带 usage）
-                            usage = openai_chunk.get("usage")
-                            if usage:
-                                _tokens_prompt = usage.get("prompt_tokens", 0) or _tokens_prompt
-                                _tokens_completion = usage.get("completion_tokens", 0) or _tokens_completion
-                            events = convert_openai_chunk_to_anthropic(openai_chunk, external_model, _stream_state)
-                            if _line_count <= 5:
-                                logger.info(f"[ANTHROPIC] Converted {len(events)} events: {[e['event'] for e in events] if events else 'empty'}")
+                            try:
+                                openai_chunk = json.loads(data_str)
+                                # 提取 token 用量（OpenAI 流式最后一帧可能带 usage）
+                                usage = openai_chunk.get("usage")
+                                if usage:
+                                    _tokens_prompt = usage.get("prompt_tokens", 0) or _tokens_prompt
+                                    _tokens_completion = usage.get("completion_tokens", 0) or _tokens_completion
+                                events = convert_openai_chunk_to_anthropic(openai_chunk, external_model, _stream_state)
+                                if _line_count <= 5:
+                                    logger.info(f"[ANTHROPIC] Converted {len(events)} events: {[e['event'] for e in events] if events else 'empty'}")
 
-                            # 如果转换函数没有发出 message_start（首 chunk 无 role），补发
-                            if not _sent_message_start:
-                                if events and events[0]["event"] == "message_start":
-                                    _sent_message_start = True
-                                else:
-                                    yield format_sse_event("message_start", {
-                                        "type": "message_start",
-                                        "message": {
-                                            "id": f"msg_{int(time.time())}",
-                                            "type": "message",
-                                            "role": "assistant",
-                                            "content": [],
-                                            "model": external_model,
-                                            "stop_reason": None,
-                                            "stop_sequence": None,
-                                            "usage": {"input_tokens": 0, "output_tokens": 0},
-                                        },
-                                    })
-                                    _sent_message_start = True
+                                # 如果转换函数没有发出 message_start（首 chunk 无 role），补发
+                                if not _sent_message_start:
+                                    if events and events[0]["event"] == "message_start":
+                                        _sent_message_start = True
+                                    else:
+                                        sse_msg = format_sse_event("message_start", {
+                                            "type": "message_start",
+                                            "message": {
+                                                "id": f"msg_{int(time.time())}",
+                                                "type": "message",
+                                                "role": "assistant",
+                                                "content": [],
+                                                "model": external_model,
+                                                "stop_reason": None,
+                                                "stop_sequence": None,
+                                                "usage": {"input_tokens": 0, "output_tokens": 0},
+                                            },
+                                        })
+                                        _yield_count += 1
+                                        yield sse_msg
+                                        _sent_message_start = True
 
-                            for event in events:
-                                if event["event"] == "message_stop":
-                                    _sent_finish = True
-                                yield format_sse_event(event["event"], event["data"])
-                        except json.JSONDecodeError:
-                            continue
+                                for event in events:
+                                    if event["event"] == "message_stop":
+                                        _sent_finish = True
+                                    sse_data = format_sse_event(event["event"], event["data"])
+                                    _yield_count += 1
+                                    if _yield_count <= 5:
+                                        logger.info(f"[ANTHROPIC] Yield #{_yield_count}: {sse_data[:200]}")
+                                    yield sse_data
+                            except json.JSONDecodeError:
+                                continue
+
+                    logger.info(f"[ANTHROPIC] Stream done: {_line_count} lines read, {_yield_count} events yielded")
+                except Exception as e:
+                    logger.error(f"[ANTHROPIC] Stream error: {type(e).__name__}: {e}")
 
                 # 如果后端没给 finish_reason，补发结束事件
                 if not _sent_finish:
