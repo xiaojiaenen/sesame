@@ -197,7 +197,7 @@ async def responses_endpoint(request: Request):
 
     except proxy_service.BackendAuthError:
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 401)
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 401, error_message="后端认证失败")
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
             status_code=401, error_message="认证失败",
@@ -207,7 +207,7 @@ async def responses_endpoint(request: Request):
         })
     except proxy_service.BackendError as e:
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 502)
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 502, error_message=str(e))
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
             status_code=502, error_message=str(e),
@@ -218,7 +218,7 @@ async def responses_endpoint(request: Request):
 
 
 async def _log_request(user_id, key_id, model, duration_ms, status_code,
-                        tokens_prompt=0, tokens_completion=0, is_stream=False):
+                        tokens_prompt=0, tokens_completion=0, is_stream=False, error_message=None):
     try:
         internal_model = proxy_service._last_backend_model.get() or model
         async with async_session() as db:
@@ -227,6 +227,7 @@ async def _log_request(user_id, key_id, model, duration_ms, status_code,
                 internal_model=internal_model, tokens_prompt=tokens_prompt,
                 tokens_completion=tokens_completion, latency_ms=duration_ms,
                 status_code=status_code, is_stream=is_stream, api_format="responses",
+                error_message=error_message,
             )
     except Exception:
         pass

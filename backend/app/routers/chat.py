@@ -109,7 +109,7 @@ async def _proxy_request(request: Request, auth: AuthUser):
     except proxy_service.BackendAuthError:
         logger.warning(f"[CHAT] BackendAuthError from {url if 'url' in dir() else 'unknown'}")
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, stream, 401, duration_ms)
+        await _log_request(auth.user_id, auth.key_id, external_model, stream, 401, duration_ms, error_message="后端认证失败")
         await broadcast_request_event(
             event_type="request_error",
             user_id=auth.user_id,
@@ -124,7 +124,7 @@ async def _proxy_request(request: Request, auth: AuthUser):
     except proxy_service.BackendError as e:
         logger.error(f"[CHAT] BackendError: {e}")
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, stream, 502, duration_ms)
+        await _log_request(auth.user_id, auth.key_id, external_model, stream, 502, duration_ms, error_message=str(e))
         await broadcast_request_event(
             event_type="request_error",
             user_id=auth.user_id,
@@ -189,7 +189,7 @@ async def _update_key_last_used(key_id: int):
         pass
 
 
-async def _log_request(user_id, key_id, external_model, stream, status_code, duration_ms, tokens_prompt=0, tokens_completion=0):
+async def _log_request(user_id, key_id, external_model, stream, status_code, duration_ms, tokens_prompt=0, tokens_completion=0, error_message=None):
     try:
         from app.services.proxy_service import _last_backend_model
         internal_model = _last_backend_model.get() or external_model
@@ -206,6 +206,7 @@ async def _log_request(user_id, key_id, external_model, stream, status_code, dur
                 status_code=status_code,
                 is_stream=stream,
                 api_format="openai",
+                error_message=error_message,
             )
     except Exception as e:
         import logging

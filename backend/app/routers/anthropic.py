@@ -305,7 +305,7 @@ async def anthropic_messages(
 
     except proxy_service.BackendAuthError:
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 401)
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 401, error_message="后端认证失败")
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
             status_code=401, error_message="认证失败",
@@ -322,7 +322,7 @@ async def anthropic_messages(
         )
     except proxy_service.BackendError as e:
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 502)
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 502, error_message=str(e))
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
             status_code=502, error_message=str(e),
@@ -339,7 +339,7 @@ async def anthropic_messages(
         )
 
 
-async def _log_request(user_id: str, key_id: int | None, model: str, duration_ms: int, status_code: int, tokens_prompt: int = 0, tokens_completion: int = 0, is_stream: bool = False):
+async def _log_request(user_id: str, key_id: int | None, model: str, duration_ms: int, status_code: int, tokens_prompt: int = 0, tokens_completion: int = 0, is_stream: bool = False, error_message: str | None = None):
     """记录请求日志"""
     try:
         internal_model = proxy_service._last_backend_model.get() or model
@@ -356,6 +356,7 @@ async def _log_request(user_id: str, key_id: int | None, model: str, duration_ms
                 status_code=status_code,
                 is_stream=is_stream,
                 api_format="anthropic",
+                error_message=error_message,
             )
     except Exception:
         pass

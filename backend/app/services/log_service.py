@@ -103,6 +103,7 @@ async def get_logs(
     end_date: str | None = None,
     limit: int = 100,
     offset: int = 0,
+    errors_only: bool = False,
 ) -> list[RequestLog]:
     query = select(RequestLog).order_by(RequestLog.created_at.desc())
 
@@ -114,6 +115,8 @@ async def get_logs(
         query = query.where(RequestLog.created_at >= datetime.fromisoformat(start_date))
     if end_date:
         query = query.where(RequestLog.created_at <= datetime.fromisoformat(end_date) + timedelta(days=1))
+    if errors_only:
+        query = query.where(RequestLog.status_code >= 400)
 
     query = query.limit(limit).offset(offset)
     result = await db.execute(query)
@@ -126,6 +129,7 @@ async def get_logs_count(
     model: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    errors_only: bool = False,
 ) -> int:
     query = select(func.count(RequestLog.id))
 
@@ -137,6 +141,8 @@ async def get_logs_count(
         query = query.where(RequestLog.created_at >= datetime.fromisoformat(start_date))
     if end_date:
         query = query.where(RequestLog.created_at <= datetime.fromisoformat(end_date) + timedelta(days=1))
+    if errors_only:
+        query = query.where(RequestLog.status_code >= 400)
 
     result = await db.execute(query)
     return result.scalar() or 0

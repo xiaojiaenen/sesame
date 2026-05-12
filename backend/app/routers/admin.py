@@ -294,13 +294,14 @@ async def list_logs(
     model: str | None = None,
     start_date: str | None = None,
     end_date: str | None = None,
+    errors_only: bool = False,
     limit: int = Query(100, le=1000),
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
     _: AuthUser = Depends(get_admin_user),
 ):
-    logs = await log_service.get_logs(db, user_id, model, start_date, end_date, limit, offset)
-    total = await log_service.get_logs_count(db, user_id, model, start_date, end_date)
+    logs = await log_service.get_logs(db, user_id, model, start_date, end_date, limit, offset, errors_only)
+    total = await log_service.get_logs_count(db, user_id, model, start_date, end_date, errors_only)
     return {
         "total": total,
         "logs": [

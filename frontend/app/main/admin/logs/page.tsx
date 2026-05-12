@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,7 @@ import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { FileText, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileText, Search, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
 
 interface RequestLog {
   id: number;
@@ -44,6 +45,7 @@ export default function LogsPage() {
   const [model, setModel] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [errorsOnly, setErrorsOnly] = useState(false);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -56,6 +58,7 @@ export default function LogsPage() {
       if (model) params.append("model", model);
       if (startDate) params.append("start_date", startDate);
       if (endDate) params.append("end_date", endDate);
+      if (errorsOnly) params.append("errors_only", "true");
 
       const data = await apiFetch(`/admin/logs?${params}`);
       setLogs(data.logs);
@@ -69,7 +72,7 @@ export default function LogsPage() {
 
   useEffect(() => {
     fetchLogs();
-  }, [page]);
+  }, [page, errorsOnly]);
 
   const handleSearch = () => {
     setPage(0);
@@ -110,6 +113,20 @@ export default function LogsPage() {
           <Search className="w-4 h-4 mr-2" />
           搜索
         </Button>
+        <div className="flex items-center gap-2 pb-1">
+          <Checkbox
+            id="errorsOnly"
+            checked={errorsOnly}
+            onCheckedChange={(checked) => {
+              setErrorsOnly(checked === true);
+              setPage(0);
+            }}
+          />
+          <Label htmlFor="errorsOnly" className="text-sm cursor-pointer flex items-center gap-1">
+            <AlertCircle className="w-3.5 h-3.5 text-destructive" />
+            仅错误
+          </Label>
+        </div>
       </motion.div>
 
       {/* Table */}
@@ -130,6 +147,7 @@ export default function LogsPage() {
                   <TableHead className="font-semibold text-foreground">延迟</TableHead>
                   <TableHead className="font-semibold text-foreground">格式</TableHead>
                   <TableHead className="font-semibold text-foreground">状态</TableHead>
+                  <TableHead className="font-semibold text-foreground">错误信息</TableHead>
                   <TableHead className="font-semibold text-foreground">类型</TableHead>
                 </TableRow>
               </TableHeader>
@@ -145,12 +163,13 @@ export default function LogsPage() {
                       <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-12" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                     </TableRow>
                   ))
                 ) : logs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9}>
+                    <TableCell colSpan={10}>
                       <EmptyState
                         icon={<FileText className="w-8 h-8 text-muted-foreground" />}
                         title="暂无请求日志"
@@ -202,6 +221,15 @@ export default function LogsPage() {
                         <Badge variant={log.status_code && log.status_code < 400 ? "default" : "destructive"}>
                           {log.status_code || "-"}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {log.error_message ? (
+                          <span className="text-xs text-destructive max-w-[200px] truncate block" title={log.error_message}>
+                            {log.error_message}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge variant={log.is_stream ? "secondary" : "outline"} className="text-[11px]">
