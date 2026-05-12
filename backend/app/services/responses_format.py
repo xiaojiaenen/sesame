@@ -226,14 +226,14 @@ def convert_openai_chunk_to_responses_events(
     if reasoning:
         if not state.get("reasoning_started"):
             state["reasoning_started"] = True
-            # 发送 reasoning output_item.added
+            state["reasoning_id"] = f"rs_{uuid.uuid4().hex[:12]}"
             state["reasoning_output_idx"] = state["next_output_idx"]
             state["next_output_idx"] += 1
             events.append({
                 "type": "response.output_item.added",
                 "item": {
                     "type": "reasoning",
-                    "id": f"rs_{uuid.uuid4().hex[:12]}",
+                    "id": state["reasoning_id"],
                     "summary": [],
                 },
                 "output_index": state["reasoning_output_idx"],
@@ -241,7 +241,7 @@ def convert_openai_chunk_to_responses_events(
         state["reasoning_buf"] += reasoning
         events.append({
             "type": "response.reasoning_summary_text.delta",
-            "item_id": state.get("msg_id", ""),
+            "item_id": state["reasoning_id"],
             "output_index": state["reasoning_output_idx"],
             "delta": reasoning,
         })
@@ -334,7 +334,7 @@ def convert_openai_chunk_to_responses_events(
         if state.get("reasoning_started"):
             events.append({
                 "type": "response.reasoning_summary_text.done",
-                "item_id": state.get("msg_id", ""),
+                "item_id": state["reasoning_id"],
                 "output_index": state["reasoning_output_idx"],
                 "text": state["reasoning_buf"],
             })
@@ -342,7 +342,7 @@ def convert_openai_chunk_to_responses_events(
                 "type": "response.output_item.done",
                 "item": {
                     "type": "reasoning",
-                    "id": f"rs_{uuid.uuid4().hex[:12]}",
+                    "id": state["reasoning_id"],
                     "summary": [{"type": "summary_text", "text": state["reasoning_buf"]}],
                 },
                 "output_index": state["reasoning_output_idx"],
@@ -405,7 +405,7 @@ def build_response_completed(state: dict, model: str) -> dict:
     if state.get("reasoning_started"):
         output_items.append({
             "type": "reasoning",
-            "id": f"rs_{uuid.uuid4().hex[:12]}",
+            "id": state.get("reasoning_id", f"rs_{uuid.uuid4().hex[:12]}"),
             "summary": [{"type": "summary_text", "text": state.get("reasoning_buf", "")}],
         })
 
