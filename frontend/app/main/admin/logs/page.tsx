@@ -10,12 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { FileText, Search, ChevronLeft, ChevronRight, AlertCircle } from "lucide-react";
+import { FileText, Search, ChevronLeft, ChevronRight, AlertCircle, Zap, ArrowDown, ArrowUp, Wifi, WifiOff } from "lucide-react";
 
 interface RequestLog {
   id: number;
@@ -32,6 +31,108 @@ interface RequestLog {
   api_format: string | null;
   error_message: string | null;
   created_at: string | null;
+}
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2).replace(/\.?0+$/, '') + 'B';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return String(n);
+}
+
+function formatTime(dateStr: string): { time: string; date: string } {
+  const d = new Date(dateStr);
+  const time = d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const date = d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+  return { time, date };
+}
+
+function StatusBadge({ code }: { code: number | null }) {
+  if (!code) return <span className="text-muted-foreground text-xs">-</span>;
+  const is2xx = code >= 200 && code < 300;
+  const is4xx = code >= 400 && code < 500;
+  const is5xx = code >= 500;
+
+  return (
+    <span className={`
+      inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold tabular-nums
+      ${is2xx ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : ''}
+      ${is4xx ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' : ''}
+      ${is5xx ? 'bg-red-500/10 text-red-600 dark:text-red-400' : ''}
+      ${!is2xx && !is4xx && !is5xx ? 'bg-muted text-muted-foreground' : ''}
+    `}>
+      {is5xx && <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />}
+      {code}
+    </span>
+  );
+}
+
+function LatencyCell({ ms }: { ms: number | null }) {
+  if (!ms) return <span className="text-muted-foreground text-xs">-</span>;
+  const color = ms < 1000 ? 'text-emerald-600 dark:text-emerald-400'
+    : ms < 3000 ? 'text-amber-600 dark:text-amber-400'
+    : 'text-red-600 dark:text-red-400';
+  const bg = ms < 1000 ? 'bg-emerald-500/10'
+    : ms < 3000 ? 'bg-amber-500/10'
+    : 'bg-red-500/10';
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium tabular-nums ${color} ${bg}`}>
+      {ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`}
+    </span>
+  );
+}
+
+function FormatBadge({ format }: { format: string | null }) {
+  if (!format) return <span className="text-muted-foreground text-xs">-</span>;
+  const styles: Record<string, { bg: string; text: string; label: string }> = {
+    openai: { bg: 'bg-violet-500/10', text: 'text-violet-600 dark:text-violet-400', label: 'OpenAI' },
+    anthropic: { bg: 'bg-orange-500/10', text: 'text-orange-600 dark:text-orange-400', label: 'Anthropic' },
+    responses: { bg: 'bg-sky-500/10', text: 'text-sky-600 dark:text-sky-400', label: 'Responses' },
+  };
+  const s = styles[format] || { bg: 'bg-muted', text: 'text-muted-foreground', label: format };
+
+  return (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${s.bg} ${s.text}`}>
+      {s.label}
+    </span>
+  );
+}
+
+function TokenCell({ prompt, completion }: { prompt: number; completion: number }) {
+  const total = prompt + completion;
+  if (total === 0) return <span className="text-muted-foreground text-xs">0</span>;
+  const promptPct = total > 0 ? (prompt / total) * 100 : 50;
+
+  return (
+    <div className="flex items-center gap-2 min-w-[120px]">
+      <div className="flex-1 space-y-1">
+        <div className="text-xs font-semibold tabular-nums text-foreground">{formatTokens(total)}</div>
+        <div className="flex h-1.5 rounded-full overflow-hidden bg-muted/60">
+          <div className="bg-sky-400 dark:bg-sky-500 rounded-l-full" style={{ width: `${promptPct}%` }} />
+          <div className="bg-violet-400 dark:bg-violet-500 rounded-r-full" style={{ width: `${100 - promptPct}%` }} />
+        </div>
+      </div>
+      <div className="flex flex-col text-[10px] text-muted-foreground leading-tight tabular-nums shrink-0">
+        <span className="flex items-center gap-0.5"><ArrowDown className="w-2.5 h-2.5 text-sky-400" />{formatTokens(prompt)}</span>
+        <span className="flex items-center gap-0.5"><ArrowUp className="w-2.5 h-2.5 text-violet-400" />{formatTokens(completion)}</span>
+      </div>
+    </div>
+  );
+}
+
+function StreamBadge({ isStream }: { isStream: boolean }) {
+  return isStream ? (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400">
+      <Wifi className="w-3 h-3" />
+      流式
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-muted text-muted-foreground">
+      <WifiOff className="w-3 h-3" />
+      非流式
+    </span>
+  );
 }
 
 export default function LogsPage() {
@@ -134,37 +235,37 @@ export default function LogsPage() {
         {...fadeInUp}
         transition={{ ...fadeInUp.transition, delay: 0.1 }}
       >
-        <Card className="ring-1 ring-border/40 shadow-xs">
+        <Card className="ring-1 ring-border/40 shadow-xs overflow-hidden">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/30">
-                  <TableHead className="font-semibold text-foreground h-12">时间</TableHead>
-                  <TableHead className="font-semibold text-foreground">用户</TableHead>
-                  <TableHead className="font-semibold text-foreground">请求模型</TableHead>
-                  <TableHead className="font-semibold text-foreground">实际模型</TableHead>
-                  <TableHead className="font-semibold text-foreground">Token 消耗</TableHead>
-                  <TableHead className="font-semibold text-foreground">延迟</TableHead>
-                  <TableHead className="font-semibold text-foreground">格式</TableHead>
-                  <TableHead className="font-semibold text-foreground">状态</TableHead>
-                  <TableHead className="font-semibold text-foreground">错误信息</TableHead>
-                  <TableHead className="font-semibold text-foreground">类型</TableHead>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="font-semibold text-foreground h-11 text-xs uppercase tracking-wider">时间</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">用户</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">请求模型</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">实际模型</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">Token 消耗</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">延迟</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">格式</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">状态</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">错误信息</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">类型</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
+                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-8 w-28" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-12 rounded-full" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : logs.length === 0 ? (
@@ -178,66 +279,68 @@ export default function LogsPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  logs.map((log, i) => (
-                    <motion.tr
-                      key={log.id}
-                      {...fadeInUp}
-                      transition={{ ...fadeInUp.transition, delay: i * 0.02 }}
-                      className="border-b transition-colors hover:bg-accent/50"
-                    >
-                      <TableCell className="text-sm text-muted-foreground">
-                        {log.created_at ? new Date(log.created_at).toLocaleString() : "-"}
-                      </TableCell>
-                      <TableCell className="font-medium">{log.user_id}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-xs w-fit">
-                          {log.model || "-"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="font-mono text-xs w-fit">
-                          {log.internal_model || log.model || "-"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <span className="text-foreground">{log.tokens_prompt + log.tokens_completion}</span>
-                          <span className="text-muted-foreground text-xs ml-1">
-                            ({log.tokens_prompt} + {log.tokens_completion})
+                  logs.map((log, i) => {
+                    const t = log.created_at ? formatTime(log.created_at) : null;
+                    const hasError = log.status_code && log.status_code >= 400;
+                    return (
+                      <motion.tr
+                        key={log.id}
+                        {...fadeInUp}
+                        transition={{ ...fadeInUp.transition, delay: i * 0.015 }}
+                        className={`border-b transition-colors hover:bg-accent/40 ${hasError ? 'bg-destructive/[0.02]' : ''}`}
+                      >
+                        <TableCell className="py-2.5">
+                          {t ? (
+                            <div className="flex flex-col leading-tight">
+                              <span className="text-sm tabular-nums text-foreground">{t.time}</span>
+                              <span className="text-[11px] tabular-nums text-muted-foreground">{t.date}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/8 text-primary">
+                            {log.user_id}
                           </span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className={`text-sm ${log.latency_ms && log.latency_ms > 5000 ? 'text-destructive' : ''}`}>
-                          {log.latency_ms ? `${log.latency_ms}ms` : "-"}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-[11px]">
-                          {log.api_format === "anthropic" ? "Anthropic" : log.api_format === "openai" ? "OpenAI" : log.api_format === "responses" ? "Responses" : "-"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={log.status_code && log.status_code < 400 ? "default" : "destructive"}>
-                          {log.status_code || "-"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {log.error_message ? (
-                          <span className="text-xs text-destructive max-w-[200px] truncate block" title={log.error_message}>
-                            {log.error_message}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono bg-muted/60 text-foreground/80 max-w-[160px] truncate" title={log.model || ''}>
+                            {log.model || "-"}
                           </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={log.is_stream ? "secondary" : "outline"} className="text-[11px]">
-                          {log.is_stream ? "流式" : "非流式"}
-                        </Badge>
-                      </TableCell>
-                    </motion.tr>
-                  ))
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono bg-secondary/60 text-secondary-foreground max-w-[160px] truncate" title={log.internal_model || log.model || ''}>
+                            {log.internal_model || log.model || "-"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <TokenCell prompt={log.tokens_prompt} completion={log.tokens_completion} />
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <LatencyCell ms={log.latency_ms} />
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <FormatBadge format={log.api_format} />
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <StatusBadge code={log.status_code} />
+                        </TableCell>
+                        <TableCell className="py-2.5 max-w-[200px]">
+                          {log.error_message ? (
+                            <span className="text-xs text-destructive truncate block max-w-[200px] leading-relaxed" title={log.error_message}>
+                              {log.error_message}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/40 text-xs">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-2.5">
+                          <StreamBadge isStream={log.is_stream} />
+                        </TableCell>
+                      </motion.tr>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
