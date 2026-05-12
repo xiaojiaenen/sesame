@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import async_session, init_db
-from app.routers import admin, anthropic, chat, health, user
+from app.routers import admin, anthropic, chat, health, responses, user
 from app.services.apikey_service import load_keys_to_cache
 from app.services.auth_service import create_user, get_user
 from app.services.mapping_service import load_mappings_to_cache
@@ -149,6 +149,7 @@ app.add_middleware(
 )
 
 app.include_router(anthropic.router)
+app.include_router(responses.router)
 app.include_router(chat.router)
 app.include_router(health.router)
 app.include_router(admin.router)

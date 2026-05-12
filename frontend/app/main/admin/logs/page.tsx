@@ -195,7 +195,7 @@ export default function LogsPage() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-[11px]">
-                          {log.api_format === "anthropic" ? "Anthropic" : log.api_format === "openai" ? "OpenAI" : "-"}
+                          {log.api_format === "anthropic" ? "Anthropic" : log.api_format === "openai" ? "OpenAI" : log.api_format === "responses" ? "Responses" : "-"}
                         </Badge>
                       </TableCell>
                       <TableCell>
