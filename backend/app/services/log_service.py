@@ -255,3 +255,77 @@ async def get_user_stats(db: AsyncSession, days: int = 30) -> list[dict]:
         }
         for row in rows
     ]
+
+
+async def get_daily_stats_for_user(db: AsyncSession, user_id: str, days: int = 30) -> list[dict]:
+    """指定用户的每日统计"""
+    start_date = (now_beijing() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    result = await db.execute(
+        select(
+            UsageStats.date,
+            func.sum(UsageStats.total_requests).label("total_requests"),
+            func.sum(UsageStats.total_tokens).label("total_tokens"),
+            func.sum(UsageStats.total_prompt_tokens).label("total_prompt_tokens"),
+            func.sum(UsageStats.total_completion_tokens).label("total_completion_tokens"),
+            func.avg(UsageStats.avg_latency_ms).label("avg_latency_ms"),
+            func.sum(UsageStats.error_count).label("error_count"),
+        )
+        .where(UsageStats.user_id == user_id)
+        .where(UsageStats.date >= start_date)
+        .group_by(UsageStats.date)
+        .order_by(UsageStats.date)
+    )
+
+    rows = result.all()
+    return [
+        {
+            "date": row.date,
+            "total_requests": row.total_requests or 0,
+            "total_tokens": row.total_tokens or 0,
+            "total_prompt_tokens": row.total_prompt_tokens or 0,
+            "total_completion_tokens": row.total_completion_tokens or 0,
+            "avg_latency_ms": round(row.avg_latency_ms or 0, 2),
+            "error_count": row.error_count or 0,
+        }
+        for row in rows
+    ]
+
+
+async def get_user_summary(db: AsyncSession, user_id: str) -> dict:
+    """用户最近 7 天 / 30 天的汇总统计"""
+    now = now_beijing()
+    d7 = (now - timedelta(days=7)).strftime("%Y-%m-%d")
+    d30 = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+    today = now.strftime("%Y-%m-%d")
+
+    async def _query(start_date: str) -> dict:
+        result = await db.execute(
+            select(
+                func.sum(UsageStats.total_requests).label("requests"),
+                func.sum(UsageStats.total_tokens).label("tokens"),
+                func.sum(UsageStats.total_prompt_tokens).label("prompt"),
+                func.sum(UsageStats.total_completion_tokens).label("completion"),
+                func.sum(UsageStats.error_count).label("errors"),
+            )
+            .where(UsageStats.user_id == user_id)
+            .where(UsageStats.date >= start_date)
+        )
+        row = result.one()
+        return {
+            "requests": row.requests or 0,
+            "tokens": row.tokens or 0,
+            "prompt": row.prompt or 0,
+            "completion": row.completion or 0,
+            "errors": row.errors or 0,
+        }
+
+    s7 = await _query(d7)
+    s30 = await _query(d30)
+    today_stats = await _query(today)
+
+    return {
+        "today": today_stats,
+        "last_7_days": s7,
+        "last_30_days": s30,
+    }

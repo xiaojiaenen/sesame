@@ -9,10 +9,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
-import { BarChart3, TrendingUp, Users, Cpu, Clock, Zap } from "lucide-react";
+import { BarChart3, TrendingUp, Users, Cpu, Clock, Zap, Target, Gauge, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, Legend
+  PieChart, Pie, Cell, LineChart, Line, Legend, RadialBarChart, RadialBar
 } from "recharts";
 
 interface HourlyStats {
@@ -55,14 +55,8 @@ function formatTokens(n: number): string {
 }
 
 const COLORS = [
-  '#10b981', // emerald
-  '#3b82f6', // blue
-  '#8b5cf6', // violet
-  '#f59e0b', // amber
-  '#ef4444', // red
-  '#ec4899', // pink
-  '#06b6d4', // cyan
-  '#84cc16', // lime
+  '#10b981', '#3b82f6', '#8b5cf6', '#f59e0b',
+  '#ef4444', '#ec4899', '#06b6d4', '#84cc16',
 ];
 
 export default function UsagePage() {
@@ -98,13 +92,24 @@ export default function UsagePage() {
 
   const totalRequests = dailyStats.reduce((sum, d) => sum + d.total_requests, 0);
   const totalTokens = dailyStats.reduce((sum, d) => sum + d.total_tokens, 0);
+  const totalPrompt = dailyStats.reduce((sum, d) => sum + d.total_prompt_tokens, 0);
+  const totalCompletion = dailyStats.reduce((sum, d) => sum + d.total_completion_tokens, 0);
   const totalErrors = dailyStats.reduce((sum, d) => sum + d.error_count, 0);
   const avgLatency = dailyStats.length > 0
     ? Math.round(dailyStats.reduce((sum, d) => sum + d.avg_latency_ms, 0) / dailyStats.length)
     : 0;
+  const successRate = totalRequests > 0 ? ((totalRequests - totalErrors) / totalRequests * 100) : 100;
+  const avgTokensPerReq = totalRequests > 0 ? Math.round(totalTokens / totalRequests) : 0;
+
+  // 今日 vs 昨日
+  const today = dailyStats[dailyStats.length - 1];
+  const yesterday = dailyStats[dailyStats.length - 2];
+  const todayRequests = today?.total_requests ?? 0;
+  const yesterdayRequests = yesterday?.total_requests ?? 0;
+  const requestTrend = yesterdayRequests > 0 ? ((todayRequests - yesterdayRequests) / yesterdayRequests * 100) : 0;
 
   const hourlyChartData = hourlyStats.map(h => ({
-    hour: h.hour.slice(5),  // "MM-DD HH:00"
+    hour: h.hour.slice(5),
     tokens: Math.round(h.total_tokens / 1000),
     prompt: Math.round(h.prompt_tokens / 1000),
     completion: Math.round(h.completion_tokens / 1000),
@@ -115,6 +120,8 @@ export default function UsagePage() {
     date: d.date.slice(5),
     requests: d.total_requests,
     tokens: Math.round(d.total_tokens / 1000),
+    prompt: Math.round(d.total_prompt_tokens / 1000),
+    completion: Math.round(d.total_completion_tokens / 1000),
     latency: Math.round(d.avg_latency_ms),
     errors: d.error_count,
   })).reverse();
@@ -124,12 +131,14 @@ export default function UsagePage() {
     fullName: m.model,
     tokens: m.total_tokens,
     requests: m.total_requests,
+    avgLatency: Math.round(m.avg_latency_ms),
   }));
 
   const userChartData = userStats.slice(0, 8).map(u => ({
     name: u.user_id,
     tokens: u.total_tokens,
     requests: u.total_requests,
+    avgLatency: Math.round(u.avg_latency_ms),
   }));
 
   const ChartTooltip = ({ active, payload, label }: any) => {
@@ -148,8 +157,8 @@ export default function UsagePage() {
     );
   };
 
-  const SummaryCard = ({ icon: Icon, label, value, loading: l, color = "primary" }: {
-    icon: React.ElementType; label: string; value: string; loading: boolean; color?: string;
+  const SummaryCard = ({ icon: Icon, label, value, loading: l, color = "primary", sub }: {
+    icon: React.ElementType; label: string; value: string; loading: boolean; color?: string; sub?: React.ReactNode;
   }) => {
     const colorMap: Record<string, { bg: string; text: string }> = {
       primary: { bg: "bg-primary/10", text: "text-primary" },
@@ -165,11 +174,12 @@ export default function UsagePage() {
             <div className={`w-10 h-10 rounded-xl ${c.bg} flex items-center justify-center`}>
               <Icon className={`w-5 h-5 ${c.text}`} />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <div className="text-xs text-muted-foreground uppercase tracking-wider">{label}</div>
               {l ? <Skeleton className="h-7 w-16 mt-0.5" /> : (
                 <div className="text-xl font-bold text-foreground mt-0.5">{value}</div>
               )}
+              {sub && <div className="mt-1">{sub}</div>}
             </div>
           </div>
         </CardContent>
@@ -200,11 +210,32 @@ export default function UsagePage() {
       />
 
       {/* Summary */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <motion.div {...fadeInUp}><SummaryCard icon={TrendingUp} label="总请求数" value={totalRequests.toLocaleString()} loading={loading} /></motion.div>
-        <motion.div {...fadeInUp}><SummaryCard icon={BarChart3} label="总 Token" value={formatTokens(totalTokens)} loading={loading} /></motion.div>
-        <motion.div {...fadeInUp}><SummaryCard icon={Clock} label="平均延迟" value={`${avgLatency}ms`} loading={loading} color="warning" /></motion.div>
-        <motion.div {...fadeInUp}><SummaryCard icon={Zap} label="错误数" value={String(totalErrors)} loading={loading} color={totalErrors > 0 ? "destructive" : "success"} /></motion.div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <motion.div {...fadeInUp}>
+          <SummaryCard
+            icon={TrendingUp}
+            label="总请求数"
+            value={totalRequests.toLocaleString()}
+            loading={loading}
+            sub={
+              !loading && requestTrend !== 0 ? (
+                <span className={`flex items-center gap-0.5 text-xs ${requestTrend > 0 ? 'text-success' : 'text-destructive'}`}>
+                  {requestTrend > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                  {Math.abs(requestTrend).toFixed(0)}% 较昨日
+                </span>
+              ) : undefined
+            }
+          />
+        </motion.div>
+        <motion.div {...fadeInUp}>
+          <SummaryCard icon={BarChart3} label="总 Token" value={formatTokens(totalTokens)} loading={loading} />
+        </motion.div>
+        <motion.div {...fadeInUp}>
+          <SummaryCard icon={Target} label="成功率" value={`${successRate.toFixed(1)}%`} loading={loading} color={successRate >= 99 ? "success" : successRate >= 95 ? "warning" : "destructive"} />
+        </motion.div>
+        <motion.div {...fadeInUp}>
+          <SummaryCard icon={Gauge} label="平均请求 Token" value={formatTokens(avgTokensPerReq)} loading={loading} color="warning" />
+        </motion.div>
       </div>
 
       {/* Hourly Token Chart */}
@@ -213,7 +244,7 @@ export default function UsagePage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
               <Clock className="w-4 h-4 text-primary" />
-              按小时统计 Token (K)
+              按小时统计 Token
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -246,70 +277,133 @@ export default function UsagePage() {
         </Card>
       </motion.div>
 
-      {/* Requests Area Chart */}
-      <motion.div {...fadeInUp}>
-        <Card className="border-border/50 overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">每日请求量</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? <Skeleton className="h-72 w-full" /> : dailyChartData.length === 0 ? (
-              <div className="h-72 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={288}>
-                <AreaChart data={dailyChartData}>
-                  <defs>
-                    <linearGradient id="gradRequests" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Area type="monotone" dataKey="requests" name="请求数" stroke="#10b981" strokeWidth={2} fill="url(#gradRequests)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Requests Area Chart */}
+        <motion.div {...fadeInUp}>
+          <Card className="border-border/50 overflow-hidden h-full">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">每日请求量</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? <Skeleton className="h-64 w-full" /> : dailyChartData.length === 0 ? (
+                <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={256}>
+                  <AreaChart data={dailyChartData}>
+                    <defs>
+                      <linearGradient id="gradRequests" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Area type="monotone" dataKey="requests" name="请求数" stroke="#10b981" strokeWidth={2} fill="url(#gradRequests)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
 
-      {/* Token Line Chart */}
-      <motion.div {...fadeInUp}>
-        <Card className="border-border/50 overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">每日 Token 消耗 (K)</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? <Skeleton className="h-72 w-full" /> : dailyChartData.length === 0 ? (
-              <div className="h-72 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
-            ) : (
-              <ResponsiveContainer width="100%" height={288}>
-                <LineChart data={dailyChartData}>
-                  <defs>
-                    <linearGradient id="gradTokens" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
-                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Line type="monotone" dataKey="tokens" name="Token (K)" stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
+        {/* Token Line Chart */}
+        <motion.div {...fadeInUp}>
+          <Card className="border-border/50 overflow-hidden h-full">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold">每日 Token 消耗</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? <Skeleton className="h-64 w-full" /> : dailyChartData.length === 0 ? (
+                <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={256}>
+                  <LineChart data={dailyChartData}>
+                    <defs>
+                      <linearGradient id="gradTokens" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip content={<ChartTooltip />} />
+                    <Line type="monotone" dataKey="tokens" name="Token (K)" stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 4, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Prompt vs Completion 比例 */}
+        <motion.div {...fadeInUp}>
+          <Card className="border-border/50 overflow-hidden h-full">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-primary" />
+                Token 分布
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? <Skeleton className="h-48 w-full" /> : totalTokens === 0 ? (
+                <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-center">
+                    <ResponsiveContainer width={160} height={160}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Prompt', value: totalPrompt },
+                            { name: 'Completion', value: totalCompletion },
+                          ]}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={45}
+                          outerRadius={70}
+                          paddingAngle={4}
+                          dataKey="value"
+                          stroke="none"
+                        >
+                          <Cell fill="#3b82f6" />
+                          <Cell fill="#10b981" />
+                        </Pie>
+                        <Tooltip content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null;
+                          return (
+                            <div className="bg-popover/95 backdrop-blur-sm border border-border/60 rounded-xl p-3 shadow-xl">
+                              <p className="text-xs font-semibold">{payload[0].name}</p>
+                              <p className="text-xs text-muted-foreground">{formatTokens(payload[0].value as number)}</p>
+                            </div>
+                          );
+                        }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" />Prompt</span>
+                      <span className="font-medium">{formatTokens(totalPrompt)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#10b981]" />Completion</span>
+                      <span className="font-medium">{formatTokens(totalCompletion)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
         {/* Model Pie */}
         <motion.div {...fadeInUp}>
-          <Card className="border-border/50 overflow-hidden">
+          <Card className="border-border/50 overflow-hidden h-full">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Cpu className="w-4 h-4 text-primary" />
@@ -317,18 +411,18 @@ export default function UsagePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {loading ? <Skeleton className="h-72 w-full" /> : modelChartData.length === 0 ? (
-                <div className="h-72 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
+              {loading ? <Skeleton className="h-48 w-full" /> : modelChartData.length === 0 ? (
+                <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
               ) : (
                 <div className="flex flex-col items-center">
-                  <ResponsiveContainer width="100%" height={240}>
+                  <ResponsiveContainer width="100%" height={160}>
                     <PieChart>
                       <Pie
                         data={modelChartData}
                         cx="50%"
                         cy="50%"
-                        innerRadius={55}
-                        outerRadius={85}
+                        innerRadius={40}
+                        outerRadius={70}
                         paddingAngle={3}
                         dataKey="tokens"
                         nameKey="name"
@@ -346,16 +440,17 @@ export default function UsagePage() {
                             <p className="text-xs font-semibold mb-1">{d.fullName}</p>
                             <p className="text-xs text-muted-foreground">Token: {formatTokens(d.tokens)}</p>
                             <p className="text-xs text-muted-foreground">请求: {d.requests}</p>
+                            <p className="text-xs text-muted-foreground">延迟: {d.avgLatency}ms</p>
                           </div>
                         );
                       }} />
                     </PieChart>
                   </ResponsiveContainer>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 justify-center mt-2">
-                    {modelChartData.map((entry, i) => (
-                      <div key={entry.name} className="flex items-center gap-1.5 text-xs">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                        <span className="text-muted-foreground">{entry.name}</span>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-1">
+                    {modelChartData.slice(0, 5).map((entry, i) => (
+                      <div key={entry.name} className="flex items-center gap-1 text-[11px]">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                        <span className="text-muted-foreground truncate max-w-[80px]">{entry.name}</span>
                       </div>
                     ))}
                   </div>
@@ -367,7 +462,7 @@ export default function UsagePage() {
 
         {/* User Bar */}
         <motion.div {...fadeInUp}>
-          <Card className="border-border/50 overflow-hidden">
+          <Card className="border-border/50 overflow-hidden h-full">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Users className="w-4 h-4 text-primary" />
@@ -375,11 +470,11 @@ export default function UsagePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {loading ? <Skeleton className="h-72 w-full" /> : userChartData.length === 0 ? (
-                <div className="h-72 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
+              {loading ? <Skeleton className="h-48 w-full" /> : userChartData.length === 0 ? (
+                <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
               ) : (
-                <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={userChartData} layout="vertical" barSize={20}>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={userChartData.slice(0, 5)} layout="vertical" barSize={16}>
                     <defs>
                       <linearGradient id="gradUser" x1="0" y1="0" x2="1" y2="0">
                         <stop offset="0%" stopColor="#8b5cf6" />
@@ -387,8 +482,8 @@ export default function UsagePage() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" horizontal={false} />
-                    <XAxis type="number" tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis dataKey="name" type="category" width={70} tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <XAxis type="number" tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="name" type="category" width={60} tick={{ fill: 'var(--muted-foreground)', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <Tooltip content={({ active, payload }) => {
                       if (!active || !payload?.length) return null;
                       const d = payload[0].payload;
@@ -397,10 +492,11 @@ export default function UsagePage() {
                           <p className="text-xs font-semibold mb-1">{d.name}</p>
                           <p className="text-xs text-muted-foreground">Token: {formatTokens(d.tokens)}</p>
                           <p className="text-xs text-muted-foreground">请求: {d.requests}</p>
+                          <p className="text-xs text-muted-foreground">延迟: {d.avgLatency}ms</p>
                         </div>
                       );
                     }} />
-                    <Bar dataKey="tokens" name="Token 消耗" fill="url(#gradUser)" radius={[0, 6, 6, 0]} />
+                    <Bar dataKey="tokens" name="Token" fill="url(#gradUser)" radius={[0, 6, 6, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               )}

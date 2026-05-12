@@ -405,3 +405,27 @@ async def update_preferences(
         await db.execute(update(User).where(User.user_id == auth.user_id).values(**update_data))
         await db.commit()
     return {"status": "ok"}
+
+
+# --- Usage Statistics (用户自己的) ---
+
+
+@router.get("/usage/daily")
+async def get_my_daily_usage(
+    days: int = Query(30, le=365),
+    auth: AuthUser = Depends(get_jwt_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.log_service import get_daily_stats_for_user
+    stats = await get_daily_stats_for_user(db, auth.user_id, days)
+    return stats
+
+
+@router.get("/usage/summary")
+async def get_my_usage_summary(
+    auth: AuthUser = Depends(get_jwt_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.log_service import get_user_summary
+    stats = await get_user_summary(db, auth.user_id)
+    return stats

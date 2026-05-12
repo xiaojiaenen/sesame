@@ -8,21 +8,31 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
-  Key, Users, ArrowRight,
-  AlertTriangle,
-  Server, Database, BookOpen, BarChart3, FileText, Activity
+  Key, Users, ArrowRight, ArrowUpRight, ArrowDownRight,
+  AlertTriangle, Zap, Activity, Target,
+  Server, Database, BookOpen, BarChart3, FileText, TrendingUp, Clock
 } from "lucide-react";
+import {
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
+} from "recharts";
 
-function StatCard({ icon: Icon, label, value, loading, color = "primary", href }: {
+function formatTokens(n: number): string {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2).replace(/\.?0+$/, '') + 'B';
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return String(n);
+}
+
+function StatCard({ icon: Icon, label, value, loading, color = "primary", href, sub }: {
   icon: React.ElementType; label: string; value: React.ReactNode; loading?: boolean;
-  color?: string; href?: string;
+  color?: string; href?: string; sub?: React.ReactNode;
 }) {
-  const colorMap: Record<string, { bg: string; text: string; glow: string }> = {
-    primary: { bg: "bg-primary/10", text: "text-primary", glow: "shadow-primary/10" },
-    success: { bg: "bg-success/10", text: "text-success", glow: "shadow-success/10" },
-    destructive: { bg: "bg-destructive/10", text: "text-destructive", glow: "shadow-destructive/10" },
-    warning: { bg: "bg-warning/10", text: "text-warning", glow: "shadow-warning/10" },
-    "muted-foreground": { bg: "bg-muted", text: "text-muted-foreground", glow: "" },
+  const colorMap: Record<string, { bg: string; text: string }> = {
+    primary: { bg: "bg-primary/10", text: "text-primary" },
+    success: { bg: "bg-success/10", text: "text-success" },
+    destructive: { bg: "bg-destructive/10", text: "text-destructive" },
+    warning: { bg: "bg-warning/10", text: "text-warning" },
+    "muted-foreground": { bg: "bg-muted", text: "text-muted-foreground" },
   };
   const c = colorMap[color] || colorMap.primary;
 
@@ -37,6 +47,7 @@ function StatCard({ icon: Icon, label, value, loading, color = "primary", href }
             ) : (
               <p className="text-2xl font-bold text-foreground tracking-tight">{value}</p>
             )}
+            {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
           </div>
           <div className={`w-10 h-10 rounded-xl ${c.bg} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
             <Icon className={`w-5 h-5 ${c.text}`} />
@@ -50,22 +61,44 @@ function StatCard({ icon: Icon, label, value, loading, color = "primary", href }
   return content;
 }
 
+interface SummaryData {
+  today: { requests: number; tokens: number; prompt: number; completion: number; errors: number };
+  last_7_days: { requests: number; tokens: number; prompt: number; completion: number; errors: number };
+  last_30_days: { requests: number; tokens: number; prompt: number; completion: number; errors: number };
+}
+
+interface DailyStats {
+  date: string;
+  total_requests: number;
+  total_tokens: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
+  avg_latency_ms: number;
+  error_count: number;
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [channelCount, setChannelCount] = useState<number | null>(null);
   const [apiKeyCount, setApiKeyCount] = useState<number | null>(null);
   const [adminStats, setAdminStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [channelsRes, apiKeysRes] = await Promise.allSettled([
+        const [channelsRes, apiKeysRes, summaryRes, dailyRes] = await Promise.allSettled([
           apiFetch("/user/channels"),
-          apiFetch("/user/api-keys")
+          apiFetch("/user/api-keys"),
+          apiFetch("/user/usage/summary"),
+          apiFetch("/user/usage/daily?days=14"),
         ]);
         if (channelsRes.status === "fulfilled") setChannelCount(channelsRes.value.total ?? 0);
         if (apiKeysRes.status === "fulfilled") setApiKeyCount(Array.isArray(apiKeysRes.value) ? apiKeysRes.value.length : (apiKeysRes.value.total ?? 0));
+        if (summaryRes.status === "fulfilled") setSummary(summaryRes.value);
+        if (dailyRes.status === "fulfilled") setDailyStats(dailyRes.value);
 
         if (user?.role === "admin") {
           const [usersRes, channelsRes, healthRes] = await Promise.allSettled([
@@ -87,6 +120,18 @@ export default function DashboardPage() {
     };
     if (user) fetchDashboardData();
   }, [user]);
+
+  const todaySuccessRate = summary?.today
+    ? summary.today.requests > 0
+      ? ((summary.today.requests - summary.today.errors) / summary.today.requests * 100)
+      : 100
+    : null;
+
+  const chartData = dailyStats.map(d => ({
+    date: d.date.slice(5),
+    tokens: d.total_tokens,
+    requests: d.total_requests,
+  }));
 
   return (
     <div className="space-y-8">
@@ -123,7 +168,105 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Bento Grid */}
+      {/* User Usage Summary Cards */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <Zap className="w-4 h-4 text-primary" />
+          我的用量
+        </h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            icon={Activity}
+            label="今日请求"
+            value={summary?.today.requests ?? 0}
+            loading={loading}
+            color="primary"
+            sub={summary?.today.errors ? <span className="text-destructive">{summary.today.errors} 错误</span> : undefined}
+          />
+          <StatCard
+            icon={Zap}
+            label="今日 Token"
+            value={formatTokens(summary?.today.tokens ?? 0)}
+            loading={loading}
+            color="success"
+            sub={summary?.today.tokens ? <span>{formatTokens(summary.today.prompt)} 输入 / {formatTokens(summary.today.completion)} 输出</span> : undefined}
+          />
+          <StatCard
+            icon={TrendingUp}
+            label="7 日 Token"
+            value={formatTokens(summary?.last_7_days.tokens ?? 0)}
+            loading={loading}
+            color="warning"
+            sub={summary?.last_7_days.requests ? <span>{summary.last_7_days.requests} 次请求</span> : undefined}
+          />
+          <StatCard
+            icon={Target}
+            label="今日成功率"
+            value={todaySuccessRate !== null ? `${todaySuccessRate.toFixed(1)}%` : "-"}
+            loading={loading}
+            color={todaySuccessRate !== null && todaySuccessRate >= 99 ? "success" : todaySuccessRate !== null && todaySuccessRate >= 95 ? "warning" : "destructive"}
+          />
+        </div>
+      </div>
+
+      {/* Token Usage Chart */}
+      {chartData.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-primary" />
+            近期用量趋势
+          </h3>
+          <Card className="border-border/50">
+            <CardContent className="p-5">
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorTokens" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v) => formatTokens(v)}
+                    width={50}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                    }}
+                    formatter={(value: any, name: any) => [
+                      name === 'tokens' ? formatTokens(Number(value)) : value,
+                      name === 'tokens' ? 'Token 消耗' : '请求数'
+                    ]}
+                    labelFormatter={(label) => `日期: ${label}`}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="tokens"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    fill="url(#colorTokens)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Account + Infrastructure Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* User Card — spans 2 cols */}
         <Card className="md:col-span-2 border-border/50 overflow-hidden relative">
