@@ -13,7 +13,7 @@ import {
   Server, Database, BookOpen, BarChart3, FileText, TrendingUp, Clock
 } from "lucide-react";
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 
 function formatTokens(n: number): string {
@@ -27,29 +27,30 @@ function StatCard({ icon: Icon, label, value, loading, color = "primary", href, 
   icon: React.ElementType; label: string; value: React.ReactNode; loading?: boolean;
   color?: string; href?: string; sub?: React.ReactNode;
 }) {
-  const colorMap: Record<string, { bg: string; text: string }> = {
-    primary: { bg: "bg-primary/10", text: "text-primary" },
-    success: { bg: "bg-success/10", text: "text-success" },
-    destructive: { bg: "bg-destructive/10", text: "text-destructive" },
-    warning: { bg: "bg-warning/10", text: "text-warning" },
-    "muted-foreground": { bg: "bg-muted", text: "text-muted-foreground" },
+  const colorMap: Record<string, { bg: string; text: string; border: string }> = {
+    primary: { bg: "bg-primary/10", text: "text-primary", border: "border-primary/20" },
+    success: { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/20" },
+    destructive: { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400", border: "border-red-500/20" },
+    warning: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", border: "border-amber-500/20" },
+    "muted-foreground": { bg: "bg-muted", text: "text-muted-foreground", border: "border-border" },
   };
   const c = colorMap[color] || colorMap.primary;
 
   const content = (
-    <Card className="hover:shadow-md hover:shadow-primary/5 transition-all duration-200 h-full group cursor-pointer border-border/50">
-      <CardContent className="p-5">
+    <Card className={`hover:shadow-lg transition-all duration-300 h-full group cursor-pointer border-border/40 hover:${c.border} relative overflow-hidden`}>
+      <div className={`absolute top-0 right-0 w-24 h-24 ${c.bg} rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/2`} />
+      <CardContent className="p-5 relative">
         <div className="flex items-start justify-between">
           <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">{label}</p>
             {loading ? (
-              <div className="h-8 w-16 skeleton-shimmer rounded-md" />
+              <div className="h-9 w-20 skeleton-shimmer rounded-lg" />
             ) : (
-              <p className="text-2xl font-bold text-foreground tracking-tight">{value}</p>
+              <p className="text-[28px] font-bold text-foreground tracking-tight leading-none">{value}</p>
             )}
-            {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
+            {sub && <div className="text-xs text-muted-foreground pt-0.5">{sub}</div>}
           </div>
-          <div className={`w-10 h-10 rounded-xl ${c.bg} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
+          <div className={`w-11 h-11 rounded-2xl ${c.bg} flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
             <Icon className={`w-5 h-5 ${c.text}`} />
           </div>
         </div>
@@ -133,11 +134,28 @@ export default function DashboardPage() {
     requests: d.total_requests,
   }));
 
+  const ChartTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="bg-popover/95 backdrop-blur-md border border-border/60 rounded-xl p-3 shadow-2xl">
+        <p className="text-xs font-semibold text-foreground mb-1.5">{label}</p>
+        {payload.map((entry: any, i: number) => (
+          <div key={i} className="flex items-center gap-2 text-xs">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span className="text-muted-foreground">{entry.name}:</span>
+            <span className="font-semibold text-foreground tabular-nums">{formatTokens(entry.value)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-8">
-      {/* Header with gradient accent */}
-      <div className="relative">
-        <div className="absolute -top-4 -left-4 w-24 h-24 bg-primary/5 rounded-full blur-2xl" />
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 via-transparent to-violet-500/5 p-6 -mx-1">
+        <div className="absolute -top-8 -right-8 w-40 h-40 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-violet-500/5 rounded-full blur-3xl" />
         <div className="relative">
           <h2 className="text-2xl font-bold text-foreground tracking-tight">
             欢迎回来，{user?.user_id}
@@ -152,16 +170,16 @@ export default function DashboardPage() {
 
       {/* Alert Banner */}
       {!loading && (channelCount === 0) && (
-        <div className="bg-warning/5 border border-warning/20 rounded-xl p-4 flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5 text-warning" />
+        <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-semibold text-warning-foreground">暂无可用渠道</div>
+            <div className="text-sm font-semibold text-amber-700 dark:text-amber-400">暂无可用渠道</div>
             <div className="text-xs text-muted-foreground mt-0.5">请先在管理后台创建 API 渠道才能使用代理服务</div>
           </div>
           <Link href="/main/channels">
-            <Button size="sm" className="bg-warning hover:bg-warning/80 shrink-0">
+            <Button size="sm" className="bg-amber-500 hover:bg-amber-600 shrink-0">
               去配置 <ArrowRight className="w-3.5 h-3.5 ml-1" />
             </Button>
           </Link>
@@ -171,7 +189,9 @@ export default function DashboardPage() {
       {/* User Usage Summary Cards */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Zap className="w-4 h-4 text-primary" />
+          <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Zap className="w-3.5 h-3.5 text-primary" />
+          </div>
           我的用量
         </h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -181,7 +201,7 @@ export default function DashboardPage() {
             value={summary?.today.requests ?? 0}
             loading={loading}
             color="primary"
-            sub={summary?.today.errors ? <span className="text-destructive">{summary.today.errors} 错误</span> : undefined}
+            sub={summary?.today.errors ? <span className="text-red-500">{summary.today.errors} 错误</span> : undefined}
           />
           <StatCard
             icon={Zap}
@@ -189,7 +209,7 @@ export default function DashboardPage() {
             value={formatTokens(summary?.today.tokens ?? 0)}
             loading={loading}
             color="success"
-            sub={summary?.today.tokens ? <span>{formatTokens(summary.today.prompt)} 输入 / {formatTokens(summary.today.completion)} 输出</span> : undefined}
+            sub={summary?.today.tokens ? <span>{formatTokens(summary.today.prompt)} 入 / {formatTokens(summary.today.completion)} 出</span> : undefined}
           />
           <StatCard
             icon={TrendingUp}
@@ -213,51 +233,44 @@ export default function DashboardPage() {
       {chartData.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-primary" />
+            <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+              <BarChart3 className="w-3.5 h-3.5 text-primary" />
+            </div>
             近期用量趋势
           </h3>
-          <Card className="border-border/50">
-            <CardContent className="p-5">
-              <ResponsiveContainer width="100%" height={220}>
+          <Card className="border-border/40 overflow-hidden">
+            <CardContent className="p-5 pt-4">
+              <ResponsiveContainer width="100%" height={240}>
                 <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorTokens" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
                     </linearGradient>
                   </defs>
+                  <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} />
                   <XAxis
                     dataKey="date"
-                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
                     axisLine={false}
                     tickLine={false}
                   />
                   <YAxis
-                    tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                    tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
                     axisLine={false}
                     tickLine={false}
                     tickFormatter={(v) => formatTokens(v)}
                     width={50}
                   />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                      fontSize: '12px',
-                    }}
-                    formatter={(value: any, name: any) => [
-                      name === 'tokens' ? formatTokens(Number(value)) : value,
-                      name === 'tokens' ? 'Token 消耗' : '请求数'
-                    ]}
-                    labelFormatter={(label) => `日期: ${label}`}
-                  />
+                  <Tooltip content={<ChartTooltip />} />
                   <Area
                     type="monotone"
                     dataKey="tokens"
-                    stroke="hsl(var(--primary))"
-                    strokeWidth={2}
+                    name="Token"
+                    stroke="#3b82f6"
+                    strokeWidth={2.5}
                     fill="url(#colorTokens)"
+                    activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -268,20 +281,20 @@ export default function DashboardPage() {
 
       {/* Account + Infrastructure Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* User Card — spans 2 cols */}
-        <Card className="md:col-span-2 border-border/50 overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+        {/* User Card */}
+        <Card className="md:col-span-2 border-border/40 overflow-hidden relative group">
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-violet-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <CardContent className="p-5 flex items-center gap-4 relative">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shrink-0 shadow-lg shadow-primary/10">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-violet-500/10 flex items-center justify-center shrink-0 shadow-lg shadow-primary/10">
               <span className="text-xl font-bold text-primary">
                 {user?.user_id?.[0]?.toUpperCase() || "U"}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">当前用户</div>
-              <div className="text-lg font-semibold text-foreground truncate mt-0.5">{user?.user_id}</div>
+              <div className="text-[11px] text-muted-foreground uppercase tracking-widest font-semibold">当前用户</div>
+              <div className="text-lg font-bold text-foreground truncate mt-0.5">{user?.user_id}</div>
             </div>
-            <Badge variant={user?.role === "admin" ? "default" : "secondary"} className="shrink-0">
+            <Badge variant={user?.role === "admin" ? "default" : "secondary"} className="shrink-0 px-3 py-1">
               {user?.role === "admin" ? "管理员" : "普通用户"}
             </Badge>
           </CardContent>
@@ -308,7 +321,9 @@ export default function DashboardPage() {
       {user?.role === "admin" && (
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Activity className="w-4 h-4 text-primary" />
+            <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Activity className="w-3.5 h-3.5 text-primary" />
+            </div>
             系统概览
           </h3>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -330,16 +345,16 @@ export default function DashboardPage() {
             { icon: BookOpen, label: "使用说明", desc: "查看配置指南", href: "/main/guide" },
           ].map((item) => (
             <Link key={item.href} href={item.href}>
-              <Card className="hover:shadow-md hover:shadow-primary/5 transition-all duration-200 cursor-pointer group h-full border-border/50">
+              <Card className="hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 cursor-pointer group h-full border-border/40 hover:border-primary/20">
                 <CardContent className="p-4 flex items-center gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
+                  <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/10 group-hover:scale-105 transition-all duration-300">
                     <item.icon className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-foreground">{item.label}</div>
+                    <div className="text-sm font-semibold text-foreground">{item.label}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">{item.desc}</div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-foreground/60 transition-colors" />
+                  <ArrowRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
                 </CardContent>
               </Card>
             </Link>
@@ -359,10 +374,10 @@ export default function DashboardPage() {
               { icon: FileText, label: "请求日志", href: "/main/admin/logs" },
             ].map((item) => (
               <Link key={item.href} href={item.href}>
-                <Card className="hover:bg-accent/50 transition-colors cursor-pointer border-border/50">
+                <Card className="hover:bg-accent/50 hover:shadow-md transition-all duration-200 cursor-pointer border-border/40 group">
                   <CardContent className="p-3.5 flex items-center gap-2.5">
-                    <item.icon className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm text-foreground">{item.label}</span>
+                    <item.icon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                    <span className="text-sm text-foreground font-medium">{item.label}</span>
                   </CardContent>
                 </Card>
               </Link>

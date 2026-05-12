@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
-import { BarChart3, TrendingUp, Users, Cpu, Clock, Zap, Target, Gauge, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { BarChart3, TrendingUp, Users, Cpu, Clock, Zap, Target, Gauge, ArrowUpRight, ArrowDownRight, Activity } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, Legend, RadialBarChart, RadialBar
@@ -144,13 +144,13 @@ export default function UsagePage() {
   const ChartTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
     return (
-      <div className="bg-popover/95 backdrop-blur-sm border border-border/60 rounded-xl p-3 shadow-xl">
+      <div className="bg-popover/95 backdrop-blur-md border border-border/60 rounded-xl p-3 shadow-2xl">
         <p className="text-xs font-semibold text-foreground mb-1.5">{label}</p>
         {payload.map((entry: any, i: number) => (
           <div key={i} className="flex items-center gap-2 text-xs">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
             <span className="text-muted-foreground">{entry.name}:</span>
-            <span className="font-medium text-foreground">{entry.value.toLocaleString()}</span>
+            <span className="font-semibold text-foreground tabular-nums">{entry.value.toLocaleString()}</span>
           </div>
         ))}
       </div>
@@ -160,26 +160,29 @@ export default function UsagePage() {
   const SummaryCard = ({ icon: Icon, label, value, loading: l, color = "primary", sub }: {
     icon: React.ElementType; label: string; value: string; loading: boolean; color?: string; sub?: React.ReactNode;
   }) => {
-    const colorMap: Record<string, { bg: string; text: string }> = {
-      primary: { bg: "bg-primary/10", text: "text-primary" },
-      success: { bg: "bg-success/10", text: "text-success" },
-      destructive: { bg: "bg-destructive/10", text: "text-destructive" },
-      warning: { bg: "bg-warning/10", text: "text-warning" },
+    const colorMap: Record<string, { bg: string; text: string; border: string }> = {
+      primary: { bg: "bg-primary/10", text: "text-primary", border: "border-primary/20" },
+      success: { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/20" },
+      destructive: { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400", border: "border-red-500/20" },
+      warning: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", border: "border-amber-500/20" },
     };
     const c = colorMap[color] || colorMap.primary;
     return (
-      <Card className="border-border/50 hover:shadow-md hover:shadow-primary/5 transition-all duration-200">
-        <CardContent className="p-5">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl ${c.bg} flex items-center justify-center`}>
-              <Icon className={`w-5 h-5 ${c.text}`} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider">{label}</div>
-              {l ? <Skeleton className="h-7 w-16 mt-0.5" /> : (
-                <div className="text-xl font-bold text-foreground mt-0.5">{value}</div>
+      <Card className={`hover:shadow-lg transition-all duration-300 group cursor-pointer border-border/40 hover:${c.border} relative overflow-hidden`}>
+        <div className={`absolute top-0 right-0 w-24 h-24 ${c.bg} rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/2`} />
+        <CardContent className="p-5 relative">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1.5">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">{label}</p>
+              {l ? (
+                <div className="h-9 w-20 skeleton-shimmer rounded-lg" />
+              ) : (
+                <p className="text-[28px] font-bold text-foreground tracking-tight leading-none">{value}</p>
               )}
-              {sub && <div className="mt-1">{sub}</div>}
+              {sub && <div className="text-xs text-muted-foreground pt-0.5">{sub}</div>}
+            </div>
+            <div className={`w-11 h-11 rounded-2xl ${c.bg} flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
+              <Icon className={`w-5 h-5 ${c.text}`} />
             </div>
           </div>
         </CardContent>
@@ -188,65 +191,78 @@ export default function UsagePage() {
   };
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="用量统计"
-        description="查看 API 使用情况和 Token 消耗"
-        action={
-          <div className="flex gap-1.5 p-1 bg-muted rounded-lg">
+    <div className="space-y-8">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/5 via-transparent to-violet-500/5 p-6 -mx-1">
+        <div className="absolute -top-8 -right-8 w-40 h-40 bg-primary/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-violet-500/5 rounded-full blur-3xl" />
+        <div className="relative flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">用量统计</h2>
+            <p className="text-sm text-muted-foreground mt-1">查看 API 使用情况和 Token 消耗</p>
+          </div>
+          <div className="flex gap-1.5 p-1 bg-background/80 backdrop-blur-md rounded-xl border border-border/40">
             {[7, 30, 90].map(d => (
               <Button
                 key={d}
                 variant={days === d ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setDays(d)}
-                className="h-7 px-3 text-xs"
+                className="h-8 px-4 text-xs"
               >
                 {d} 天
               </Button>
             ))}
           </div>
-        }
-      />
+        </div>
+      </div>
 
       {/* Summary */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <motion.div {...fadeInUp}>
-          <SummaryCard
-            icon={TrendingUp}
-            label="总请求数"
-            value={totalRequests.toLocaleString()}
-            loading={loading}
-            sub={
-              !loading && requestTrend !== 0 ? (
-                <span className={`flex items-center gap-0.5 text-xs ${requestTrend > 0 ? 'text-success' : 'text-destructive'}`}>
-                  {requestTrend > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                  {Math.abs(requestTrend).toFixed(0)}% 较昨日
-                </span>
-              ) : undefined
-            }
-          />
-        </motion.div>
-        <motion.div {...fadeInUp}>
-          <SummaryCard icon={BarChart3} label="总 Token" value={formatTokens(totalTokens)} loading={loading} />
-        </motion.div>
-        <motion.div {...fadeInUp}>
-          <SummaryCard icon={Target} label="成功率" value={`${successRate.toFixed(1)}%`} loading={loading} color={successRate >= 99 ? "success" : successRate >= 95 ? "warning" : "destructive"} />
-        </motion.div>
-        <motion.div {...fadeInUp}>
-          <SummaryCard icon={Gauge} label="平均请求 Token" value={formatTokens(avgTokensPerReq)} loading={loading} color="warning" />
-        </motion.div>
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Zap className="w-3.5 h-3.5 text-primary" />
+          </div>
+          核心指标
+        </h3>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <motion.div {...fadeInUp}>
+            <SummaryCard
+              icon={TrendingUp}
+              label="总请求数"
+              value={totalRequests.toLocaleString()}
+              loading={loading}
+              sub={
+                !loading && requestTrend !== 0 ? (
+                  <span className={`flex items-center gap-0.5 text-xs ${requestTrend > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {requestTrend > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                    {Math.abs(requestTrend).toFixed(0)}% 较昨日
+                  </span>
+                ) : undefined
+              }
+            />
+          </motion.div>
+          <motion.div {...fadeInUp}>
+            <SummaryCard icon={BarChart3} label="总 Token" value={formatTokens(totalTokens)} loading={loading} />
+          </motion.div>
+          <motion.div {...fadeInUp}>
+            <SummaryCard icon={Target} label="成功率" value={`${successRate.toFixed(1)}%`} loading={loading} color={successRate >= 99 ? "success" : successRate >= 95 ? "warning" : "destructive"} />
+          </motion.div>
+          <motion.div {...fadeInUp}>
+            <SummaryCard icon={Gauge} label="平均请求 Token" value={formatTokens(avgTokensPerReq)} loading={loading} color="warning" />
+          </motion.div>
+        </div>
       </div>
 
       {/* Hourly Token Chart */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Clock className="w-3.5 h-3.5 text-primary" />
+          </div>
+          按小时统计 Token
+        </h3>
       <motion.div {...fadeInUp}>
-        <Card className="border-border/50 overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Clock className="w-4 h-4 text-primary" />
-              按小时统计 Token
-            </CardTitle>
-          </CardHeader>
+        <Card className="border-border/40 overflow-hidden">
           <CardContent>
             {loading ? <Skeleton className="h-72 w-full" /> : hourlyChartData.length === 0 ? (
               <div className="h-72 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
@@ -276,15 +292,21 @@ export default function UsagePage() {
           </CardContent>
         </Card>
       </motion.div>
+      </div>
 
+      {/* Daily Charts */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Activity className="w-3.5 h-3.5 text-primary" />
+          </div>
+          每日趋势
+        </h3>
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Requests Area Chart */}
         <motion.div {...fadeInUp}>
-          <Card className="border-border/50 overflow-hidden h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">每日请求量</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Card className="border-border/40 overflow-hidden h-full">
+            <CardContent className="p-5 pt-4">
               {loading ? <Skeleton className="h-64 w-full" /> : dailyChartData.length === 0 ? (
                 <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
               ) : (
@@ -310,11 +332,8 @@ export default function UsagePage() {
 
         {/* Token Line Chart */}
         <motion.div {...fadeInUp}>
-          <Card className="border-border/50 overflow-hidden h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">每日 Token 消耗</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Card className="border-border/40 overflow-hidden h-full">
+            <CardContent className="p-5 pt-4">
               {loading ? <Skeleton className="h-64 w-full" /> : dailyChartData.length === 0 ? (
                 <div className="h-64 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
               ) : (
@@ -338,18 +357,21 @@ export default function UsagePage() {
           </Card>
         </motion.div>
       </div>
+      </div>
 
+      {/* Distribution Charts */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+            <BarChart3 className="w-3.5 h-3.5 text-primary" />
+          </div>
+          分布统计
+        </h3>
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Prompt vs Completion 比例 */}
         <motion.div {...fadeInUp}>
-          <Card className="border-border/50 overflow-hidden h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-primary" />
-                Token 分布
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Card className="border-border/40 overflow-hidden h-full">
+            <CardContent className="p-5 pt-4">
               {loading ? <Skeleton className="h-48 w-full" /> : totalTokens === 0 ? (
                 <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
               ) : (
@@ -376,7 +398,7 @@ export default function UsagePage() {
                         <Tooltip content={({ active, payload }) => {
                           if (!active || !payload?.length) return null;
                           return (
-                            <div className="bg-popover/95 backdrop-blur-sm border border-border/60 rounded-xl p-3 shadow-xl">
+                            <div className="bg-popover/95 backdrop-blur-md border border-border/60 rounded-xl p-3 shadow-2xl">
                               <p className="text-xs font-semibold">{payload[0].name}</p>
                               <p className="text-xs text-muted-foreground">{formatTokens(payload[0].value as number)}</p>
                             </div>
@@ -403,14 +425,8 @@ export default function UsagePage() {
 
         {/* Model Pie */}
         <motion.div {...fadeInUp}>
-          <Card className="border-border/50 overflow-hidden h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Cpu className="w-4 h-4 text-primary" />
-                按模型统计
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Card className="border-border/40 overflow-hidden h-full">
+            <CardContent className="p-5 pt-4">
               {loading ? <Skeleton className="h-48 w-full" /> : modelChartData.length === 0 ? (
                 <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
               ) : (
@@ -436,7 +452,7 @@ export default function UsagePage() {
                         if (!active || !payload?.length) return null;
                         const d = payload[0].payload;
                         return (
-                          <div className="bg-popover/95 backdrop-blur-sm border border-border/60 rounded-xl p-3 shadow-xl">
+                          <div className="bg-popover/95 backdrop-blur-md border border-border/60 rounded-xl p-3 shadow-2xl">
                             <p className="text-xs font-semibold mb-1">{d.fullName}</p>
                             <p className="text-xs text-muted-foreground">Token: {formatTokens(d.tokens)}</p>
                             <p className="text-xs text-muted-foreground">请求: {d.requests}</p>
@@ -462,14 +478,8 @@ export default function UsagePage() {
 
         {/* User Bar */}
         <motion.div {...fadeInUp}>
-          <Card className="border-border/50 overflow-hidden h-full">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Users className="w-4 h-4 text-primary" />
-                按用户统计
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Card className="border-border/40 overflow-hidden h-full">
+            <CardContent className="p-5 pt-4">
               {loading ? <Skeleton className="h-48 w-full" /> : userChartData.length === 0 ? (
                 <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
               ) : (
@@ -488,7 +498,7 @@ export default function UsagePage() {
                       if (!active || !payload?.length) return null;
                       const d = payload[0].payload;
                       return (
-                        <div className="bg-popover/95 backdrop-blur-sm border border-border/60 rounded-xl p-3 shadow-xl">
+                        <div className="bg-popover/95 backdrop-blur-md border border-border/60 rounded-xl p-3 shadow-2xl">
                           <p className="text-xs font-semibold mb-1">{d.name}</p>
                           <p className="text-xs text-muted-foreground">Token: {formatTokens(d.tokens)}</p>
                           <p className="text-xs text-muted-foreground">请求: {d.requests}</p>
@@ -504,14 +514,19 @@ export default function UsagePage() {
           </Card>
         </motion.div>
       </div>
+      </div>
 
       {/* Latency + Errors */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Activity className="w-3.5 h-3.5 text-primary" />
+          </div>
+          延迟 & 错误趋势
+        </h3>
       <motion.div {...fadeInUp}>
-        <Card className="border-border/50 overflow-hidden">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold">延迟 & 错误趋势</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Card className="border-border/40 overflow-hidden">
+          <CardContent className="p-5 pt-4">
             {loading ? <Skeleton className="h-72 w-full" /> : dailyChartData.length === 0 ? (
               <div className="h-72 flex items-center justify-center text-muted-foreground text-sm">暂无数据</div>
             ) : (
@@ -531,6 +546,7 @@ export default function UsagePage() {
           </CardContent>
         </Card>
       </motion.div>
+      </div>
     </div>
   );
 }
