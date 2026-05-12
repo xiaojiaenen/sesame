@@ -7,12 +7,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { Key, ChevronLeft, ChevronRight } from "lucide-react";
+import { Key, ChevronLeft, ChevronRight, Trash2, User, Zap } from "lucide-react";
 
 export default function AdminApiKeysPage() {
   const [keys, setKeys] = useState<any[]>([]);
@@ -66,29 +65,29 @@ export default function AdminApiKeysPage() {
         {...fadeInUp}
         transition={{ ...fadeInUp.transition, delay: 0.1 }}
       >
-        <Card className="ring-1 ring-border/40 shadow-xs">
+        <Card className="ring-1 ring-border/40 shadow-xs overflow-hidden">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/30">
-                  <TableHead className="font-semibold text-foreground h-12">所属用户</TableHead>
-                  <TableHead className="font-semibold text-foreground">名称</TableHead>
-                  <TableHead className="font-semibold text-foreground">前缀</TableHead>
-                  <TableHead className="font-semibold text-foreground">可用模型</TableHead>
-                  <TableHead className="font-semibold text-foreground">QPM / 状态</TableHead>
-                  <TableHead className="font-semibold text-foreground text-right">操作</TableHead>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="font-semibold text-foreground h-11 text-xs uppercase tracking-wider">所属用户</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">名称</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">前缀</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">可用模型</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">QPM / 状态</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
                       <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded-md" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-32 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 rounded-full ml-auto" /></TableCell>
                     </TableRow>
                   ))
                 ) : keys.length === 0 ? (
@@ -106,29 +105,63 @@ export default function AdminApiKeysPage() {
                     <motion.tr
                       key={k.id}
                       {...fadeInUp}
-                      transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-accent/50"
+                      transition={{ ...fadeInUp.transition, delay: i * 0.02 }}
+                      className="border-b transition-colors hover:bg-accent/40"
                     >
-                      <TableCell className="font-medium">{k.user_id}</TableCell>
-                      <TableCell>{k.name || "-"}</TableCell>
-                      <TableCell className="font-mono text-xs">{k.key_prefix}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {(!k.allowed_models || k.allowed_models.length === 0) && <span className="text-xs text-muted-foreground">所有模型</span>}
-                          {k.allowed_models?.map((m: string) => (
-                            <Badge key={m} variant="secondary" className="text-[11px]">
-                              {m}
-                            </Badge>
-                          ))}
+                      <TableCell className="py-2.5">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary/8 text-primary">
+                          <User className="w-3 h-3" />
+                          {k.user_id}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-2.5">
+                        <span className="text-sm text-foreground">{k.name || <span className="text-muted-foreground">-</span>}</span>
+                      </TableCell>
+                      <TableCell className="py-2.5">
+                        <code className="px-2 py-0.5 rounded-md text-xs font-mono bg-muted/60 text-foreground/80">
+                          {k.key_prefix}
+                        </code>
+                      </TableCell>
+                      <TableCell className="py-2.5">
+                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                          {(!k.allowed_models || k.allowed_models.length === 0) ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                              所有模型
+                            </span>
+                          ) : (
+                            k.allowed_models.map((m: string) => (
+                              <span key={m} className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                                {m}
+                              </span>
+                            ))
+                          )}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2.5">
                         <div className="flex items-center gap-2">
-                          {k.max_qpm} <Badge variant={k.is_active ? "default" : "secondary"}>{k.is_active ? "启用" : "禁用"}</Badge>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium tabular-nums bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                            <Zap className="w-3 h-3" />
+                            {k.max_qpm}/分
+                          </span>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                            k.is_active
+                              ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                              : "bg-red-500/10 text-red-600 dark:text-red-400"
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${k.is_active ? "bg-emerald-500" : "bg-red-500"}`} />
+                            {k.is_active ? "启用" : "禁用"}
+                          </span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="destructive" size="sm" onClick={() => handleDelete(k.id)}>删除</Button>
+                      <TableCell className="py-2.5 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(k.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </TableCell>
                     </motion.tr>
                   ))

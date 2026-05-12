@@ -3,15 +3,13 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { List, ArrowRight, Box, Cpu } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ArrowRight, Box, Cpu, List } from "lucide-react";
 
 export default function ModelsPage() {
   const [models, setModels] = useState<any[]>([]);
@@ -38,84 +36,69 @@ export default function ModelsPage() {
         description="查看可用的 AI 模型及其映射关系"
       />
 
-      <motion.div {...fadeInUp}>
-        <Card className="ring-1 ring-border/40 shadow-xs overflow-hidden">
+      {loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Card key={i} className="ring-1 ring-border/40 shadow-xs">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-4">
+                  <Skeleton className="h-6 w-48 rounded-md" />
+                  <Skeleton className="h-6 w-6 rounded-full" />
+                  <Skeleton className="h-6 w-48 rounded-md" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : models.length === 0 ? (
+        <Card className="ring-1 ring-border/40 shadow-xs">
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/30">
-                  <TableHead className="font-semibold text-foreground h-12">
-                    <div className="flex items-center gap-2">
-                      <Box className="w-4 h-4 text-muted-foreground" />
-                      对外暴露模型
-                    </div>
-                  </TableHead>
-                  <TableHead className="font-semibold text-foreground h-12">
-                    <div className="flex items-center gap-2">
-                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                      映射
-                    </div>
-                  </TableHead>
-                  <TableHead className="font-semibold text-foreground h-12">
-                    <div className="flex items-center gap-2">
-                      <Cpu className="w-4 h-4 text-muted-foreground" />
-                      内部真实模型
-                    </div>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-8" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-48" /></TableCell>
-                    </TableRow>
-                  ))
-                ) : models.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={3}>
-                      <EmptyState
-                        icon={<List className="w-8 h-8 text-muted-foreground" />}
-                        title="暂无模型配置"
-                        description="管理员尚未配置任何模型映射"
-                      />
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  models.map((m: any, i) => (
-                    <motion.tr
-                      key={i}
-                      {...fadeInUp}
-                      transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-accent/50"
-                    >
-                      <TableCell>
-                        <Badge variant="outline" className="font-mono text-sm">
-                          {m.external_model}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center">
-                          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                            <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="font-mono text-sm">
-                          {m.internal_model}
-                        </Badge>
-                      </TableCell>
-                    </motion.tr>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+            <EmptyState
+              icon={<List className="w-8 h-8 text-muted-foreground" />}
+              title="暂无模型配置"
+              description="管理员尚未配置任何模型映射"
+            />
           </CardContent>
         </Card>
-      </motion.div>
+      ) : (
+        <div className="space-y-2">
+          {models.map((m: any, i) => (
+            <motion.div
+              key={i}
+              {...fadeInUp}
+              transition={{ ...fadeInUp.transition, delay: i * 0.03 }}
+            >
+              <Card className="ring-1 ring-border/40 shadow-xs hover:shadow-md hover:shadow-primary/5 transition-all duration-200 group">
+                <CardContent className="py-3.5 px-5">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-sky-500/10 flex items-center justify-center shrink-0">
+                        <Box className="w-3.5 h-3.5 text-sky-500" />
+                      </div>
+                      <code className="text-sm font-semibold font-mono text-sky-600 dark:text-sky-400 truncate">
+                        {m.external_model}
+                      </code>
+                    </div>
+
+                    <div className="w-8 h-8 rounded-full bg-muted/60 flex items-center justify-center shrink-0 group-hover:bg-primary/10 transition-colors">
+                      <ArrowRight className="w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+                    </div>
+
+                    <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+                        <Cpu className="w-3.5 h-3.5 text-violet-500" />
+                      </div>
+                      <code className="text-sm font-semibold font-mono text-violet-600 dark:text-violet-400 truncate">
+                        {m.internal_model}
+                      </code>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      )}
 
       {/* Legend */}
       <motion.div
@@ -125,8 +108,8 @@ export default function ModelsPage() {
       >
         <p className="font-medium text-foreground mb-2">说明：</p>
         <ul className="space-y-1 list-disc list-inside">
-          <li><span className="text-primary">对外暴露模型</span>：客户端请求时使用的模型名称</li>
-          <li><span className="text-success">内部真实模型</span>：实际转发给后端的模型名称</li>
+          <li><span className="text-sky-500 font-medium">对外暴露模型</span>：客户端请求时使用的模型名称</li>
+          <li><span className="text-violet-500 font-medium">内部真实模型</span>：实际转发给后端的模型名称</li>
         </ul>
       </motion.div>
     </div>

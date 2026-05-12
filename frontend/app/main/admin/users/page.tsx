@@ -11,12 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { Users, ChevronLeft, ChevronRight, Shield, User, UserMinus, Plus } from "lucide-react";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -89,6 +88,7 @@ export default function AdminUsersPage() {
         description="管理系统用户账户"
         action={
           <Button onClick={() => setIsCreateOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
             创建用户
           </Button>
         }
@@ -98,27 +98,27 @@ export default function AdminUsersPage() {
         {...fadeInUp}
         transition={{ ...fadeInUp.transition, delay: 0.1 }}
       >
-        <Card className="ring-1 ring-border/40 shadow-xs">
+        <Card className="ring-1 ring-border/40 shadow-xs overflow-hidden">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/30">
-                  <TableHead className="font-semibold text-foreground h-12">用户名</TableHead>
-                  <TableHead className="font-semibold text-foreground">角色</TableHead>
-                  <TableHead className="font-semibold text-foreground">状态</TableHead>
-                  <TableHead className="font-semibold text-foreground">创建时间</TableHead>
-                  <TableHead className="font-semibold text-foreground text-right">操作</TableHead>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="font-semibold text-foreground h-11 text-xs uppercase tracking-wider">用户名</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">角色</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">状态</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">创建时间</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 rounded-full ml-auto" /></TableCell>
                     </TableRow>
                   ))
                 ) : users.length === 0 ? (
@@ -136,25 +136,62 @@ export default function AdminUsersPage() {
                     <motion.tr
                       key={u.user_id}
                       {...fadeInUp}
-                      transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-accent/50"
+                      transition={{ ...fadeInUp.transition, delay: i * 0.02 }}
+                      className={`border-b transition-colors hover:bg-accent/40 ${!u.is_active ? 'opacity-60' : ''}`}
                     >
-                      <TableCell className="font-medium">{u.user_id}</TableCell>
-                      <TableCell>
-                        <Badge variant={u.role === "admin" ? "default" : "secondary"}>
-                          {u.role === "admin" ? "管理员" : "普通用户"}
-                        </Badge>
+                      <TableCell className="py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                            u.role === "admin"
+                              ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                              : "bg-primary/8 text-primary"
+                          }`}>
+                            {u.role === "admin" ? (
+                              <Shield className="w-4 h-4" />
+                            ) : (
+                              <User className="w-4 h-4" />
+                            )}
+                          </div>
+                          <span className="font-medium text-foreground">{u.user_id}</span>
+                        </div>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant={u.is_active ? "default" : "destructive"}>
+                      <TableCell className="py-2.5">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          u.role === "admin"
+                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                            : "bg-muted text-muted-foreground"
+                        }`}>
+                          {u.role === "admin" ? (
+                            <><Shield className="w-3 h-3" /> 管理员</>
+                          ) : (
+                            <><User className="w-3 h-3" /> 普通用户</>
+                          )}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-2.5">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          u.is_active
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : "bg-red-500/10 text-red-600 dark:text-red-400"
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${u.is_active ? "bg-emerald-500" : "bg-red-500"}`} />
                           {u.is_active ? "正常" : "禁用"}
-                        </Badge>
+                        </span>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {u.created_at ? new Date(u.created_at).toLocaleString() : "-"}
+                      <TableCell className="py-2.5">
+                        <span className="text-sm tabular-nums text-muted-foreground">
+                          {u.created_at ? new Date(u.created_at).toLocaleString("zh-CN") : "-"}
+                        </span>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="destructive" size="sm" onClick={() => handleDisable(u.user_id)} disabled={!u.is_active || u.role === "admin"}>
+                      <TableCell className="py-2.5 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDisable(u.user_id)}
+                          disabled={!u.is_active || u.role === "admin"}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-30"
+                        >
+                          <UserMinus className="w-4 h-4 mr-1" />
                           禁用
                         </Button>
                       </TableCell>
@@ -197,16 +234,21 @@ export default function AdminUsersPage() {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>创建用户</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Plus className="w-4 h-4 text-primary" />
+              </div>
+              创建用户
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>用户名</Label>
-              <Input value={userId} onChange={e => setUserId(e.target.value)} />
+              <Input value={userId} onChange={e => setUserId(e.target.value)} placeholder="输入用户名" />
             </div>
             <div className="space-y-2">
               <Label>密码</Label>
-              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} />
+              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="输入密码" />
             </div>
             <div className="space-y-2">
               <Label>角色</Label>

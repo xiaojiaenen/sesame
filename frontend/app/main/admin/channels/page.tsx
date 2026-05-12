@@ -261,33 +261,33 @@ export default function ChannelsPage() {
         {...fadeInUp}
         transition={{ ...fadeInUp.transition, delay: 0.1 }}
       >
-        <Card className="ring-1 ring-border/40 shadow-xs">
+        <Card className="ring-1 ring-border/40 shadow-xs overflow-hidden">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/30">
-                  <TableHead className="font-semibold text-foreground h-12">名称</TableHead>
-                  <TableHead className="font-semibold text-foreground">认证类型</TableHead>
-                  <TableHead className="font-semibold text-foreground">Base URL</TableHead>
-                  <TableHead className="font-semibold text-foreground">模型映射</TableHead>
-                  <TableHead className="font-semibold text-foreground">权重/优先级</TableHead>
-                  <TableHead className="font-semibold text-foreground">状态</TableHead>
-                  <TableHead className="font-semibold text-foreground">启用</TableHead>
-                  <TableHead className="font-semibold text-foreground text-right">操作</TableHead>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="font-semibold text-foreground h-11 text-xs uppercase tracking-wider">名称</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">认证类型</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">Base URL</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">模型映射</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">权重/优先级</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">状态</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">启用</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-40 rounded-md" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-32 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-10 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded-full ml-auto" /></TableCell>
                     </TableRow>
                   ))
                 ) : channels.length === 0 ? (
@@ -305,44 +305,68 @@ export default function ChannelsPage() {
                     <motion.tr
                       key={ch.id}
                       {...fadeInUp}
-                      transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-accent/50"
+                      transition={{ ...fadeInUp.transition, delay: i * 0.02 }}
+                      className={`border-b transition-colors hover:bg-accent/40 ${!ch.is_enabled ? 'opacity-60' : ''}`}
                     >
-                      <TableCell className="font-medium">{ch.name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="gap-1 text-xs">
+                      <TableCell className="py-2.5 font-medium">{ch.name}</TableCell>
+                      <TableCell className="py-2.5">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                          ch.auth_type === "cookie"
+                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                            : "bg-violet-500/10 text-violet-600 dark:text-violet-400"
+                        }`}>
                           {ch.auth_type === "cookie" ? (
                             <><Cookie className="w-3 h-3" /> Cookie</>
                           ) : (
                             <><Key className="w-3 h-3" /> API Key</>
                           )}
-                        </Badge>
+                        </span>
                       </TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground">{ch.base_url}</TableCell>
-                      <TableCell>{renderModelsCell(ch.models)}</TableCell>
-                      <TableCell>
-                        <span className="text-sm">{ch.weight} / {ch.priority}</span>
+                      <TableCell className="py-2.5">
+                        <code className="text-xs font-mono text-muted-foreground truncate max-w-[200px] block" title={ch.base_url}>
+                          {ch.base_url}
+                        </code>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant={ch.status === "active" ? "default" : ch.status === "error" ? "destructive" : "secondary"}>
+                      <TableCell className="py-2.5">{renderModelsCell(ch.models)}</TableCell>
+                      <TableCell className="py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium tabular-nums bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                            W:{ch.weight}
+                          </span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium tabular-nums bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                            P:{ch.priority}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-2.5">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          ch.status === "active"
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : ch.status === "error"
+                            ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                            : "bg-muted text-muted-foreground"
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            ch.status === "active" ? "bg-emerald-500" : ch.status === "error" ? "bg-red-500" : "bg-muted-foreground"
+                          } ${ch.status === "error" ? "animate-pulse" : ""}`} />
                           {ch.status === "active" ? "正常" : ch.status === "error" ? "异常" : "禁用"}
-                        </Badge>
+                        </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2.5">
                         <Switch
                           checked={ch.is_enabled}
                           onCheckedChange={(checked) => handleToggle(ch.id, checked)}
                         />
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleTest(ch.id)}>
+                      <TableCell className="py-2.5 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" onClick={() => handleTest(ch.id)} title="测试连接">
                             <RefreshCw className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleEdit(ch)}>
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(ch)} title="编辑">
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(ch.id)} className="text-destructive hover:text-destructive">
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(ch.id)} className="text-destructive hover:text-destructive hover:bg-destructive/10" title="删除">
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
