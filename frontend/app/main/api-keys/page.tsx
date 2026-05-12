@@ -18,7 +18,7 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import {
   Key, Plus, Copy, Check, Trash2,
-  Power, PowerOff, AlertTriangle
+  Power, PowerOff, AlertTriangle, Zap
 } from "lucide-react";
 
 export default function ApiKeysPage() {
@@ -142,30 +142,25 @@ export default function ApiKeysPage() {
           <CardContent className="p-0">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/30">
-                  <TableHead className="font-semibold text-foreground h-12">
-                    <div className="flex items-center gap-2">
-                      <Key className="w-4 h-4 text-muted-foreground" />
-                      名称
-                    </div>
-                  </TableHead>
-                  <TableHead className="font-semibold text-foreground">前缀</TableHead>
-                  <TableHead className="font-semibold text-foreground">QPM</TableHead>
-                  <TableHead className="font-semibold text-foreground">过期时间</TableHead>
-                  <TableHead className="font-semibold text-foreground">状态</TableHead>
-                  <TableHead className="font-semibold text-foreground text-right">操作</TableHead>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="font-semibold text-foreground h-11 text-xs uppercase tracking-wider">名称</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">前缀</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">QPM</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">过期时间</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">状态</TableHead>
+                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-32" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-12" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-28" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-20 rounded-md" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-28" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                      <TableCell><Skeleton className="h-5 w-24 rounded-full ml-auto" /></TableCell>
                     </TableRow>
                   ))
                 ) : keys.length === 0 ? (
@@ -193,47 +188,52 @@ export default function ApiKeysPage() {
                       key={k.id}
                       {...fadeInUp}
                       transition={{ ...fadeInUp.transition, delay: i * 0.05 }}
-                      className="border-b transition-colors hover:bg-accent/50"
+                      className={`border-b transition-colors hover:bg-accent/40 ${!k.is_active ? 'opacity-60' : ''}`}
                     >
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
-                            <Key className="w-4 h-4 text-muted-foreground" />
+                      <TableCell className="py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                            k.is_active ? "bg-primary/8 text-primary" : "bg-muted text-muted-foreground"
+                          }`}>
+                            <Key className="w-4 h-4" />
                           </div>
                           <span className="font-medium text-foreground">{k.name || "未命名"}</span>
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <code className="px-2 py-1 bg-muted rounded text-xs font-mono text-foreground">
+                      <TableCell className="py-2.5">
+                        <code className="px-2 py-0.5 rounded-md text-xs font-mono bg-muted/60 text-foreground/80">
                           {k.key_prefix}
                         </code>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <span className="font-mono text-sm">{k.max_qpm}</span>
-                          <span className="text-xs text-muted-foreground">/分</span>
-                        </div>
+                      <TableCell className="py-2.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium tabular-nums bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                          <Zap className="w-3 h-3" />
+                          {k.max_qpm}/分
+                        </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2.5">
                         {k.expire_at ? (
-                          <span className="text-sm text-muted-foreground">
+                          <span className="text-sm tabular-nums text-muted-foreground">
                             {new Date(k.expire_at).toLocaleString("zh-CN")}
                           </span>
                         ) : (
-                          <span className="text-sm text-muted-foreground">永久</span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                            永久
+                          </span>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={k.is_active ? "default" : "secondary"}
-                          className={k.is_active ? "bg-success/10 text-success" : ""}
-                        >
-                          <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${k.is_active ? "bg-success" : "bg-muted-foreground"}`} />
+                      <TableCell className="py-2.5">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          k.is_active
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : "bg-red-500/10 text-red-600 dark:text-red-400"
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${k.is_active ? "bg-emerald-500" : "bg-red-500"}`} />
                           {k.is_active ? "启用" : "禁用"}
-                        </Badge>
+                        </span>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-end gap-2">
+                      <TableCell className="py-2.5">
+                        <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -242,7 +242,7 @@ export default function ApiKeysPage() {
                             className="text-muted-foreground hover:text-foreground hover:bg-muted"
                           >
                             {copyingKeyId === k.id ? (
-                              <Check className="w-4 h-4" />
+                              <Check className="w-4 h-4 text-emerald-500" />
                             ) : (
                               <Copy className="w-4 h-4" />
                             )}
@@ -251,7 +251,7 @@ export default function ApiKeysPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => toggleActive(k.id, k.is_active)}
-                            className={k.is_active ? "text-warning hover:text-warning hover:bg-warning/10" : "text-success hover:text-success hover:bg-success/10"}
+                            className={k.is_active ? "text-amber-500 hover:text-amber-600 hover:bg-amber-500/10" : "text-emerald-500 hover:text-emerald-600 hover:bg-emerald-500/10"}
                           >
                             {k.is_active ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}
                           </Button>
