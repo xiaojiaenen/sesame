@@ -184,95 +184,96 @@ async def anthropic_messages(
             async def anthropic_stream():
                 nonlocal _tokens_prompt, _tokens_completion, _sent_message_start, _sent_finish
 
-                # 处理 OpenAI 流式响应
                 try:
-                    async for line in result.body_iterator:
-                        line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+                    # 处理 OpenAI 流式响应
+                    try:
+                        async for line in result.body_iterator:
+                            line_str = line.decode("utf-8") if isinstance(line, bytes) else line
 
-                        # 解析 SSE 数据
-                        if line_str.startswith("data: "):
-                            data_str = line_str[6:].strip()
-                            if data_str == "[DONE]":
-                                break
+                            # 解析 SSE 数据
+                            if line_str.startswith("data: "):
+                                data_str = line_str[6:].strip()
+                                if data_str == "[DONE]":
+                                    break
 
-                            try:
-                                openai_chunk = json.loads(data_str)
-                                # 提取 token 用量（OpenAI 流式最后一帧可能带 usage）
-                                usage = openai_chunk.get("usage")
-                                if usage:
-                                    _tokens_prompt = usage.get("prompt_tokens", 0) or _tokens_prompt
-                                    _tokens_completion = usage.get("completion_tokens", 0) or _tokens_completion
-                                events = convert_openai_chunk_to_anthropic(openai_chunk, external_model, _stream_state)
+                                try:
+                                    openai_chunk = json.loads(data_str)
+                                    # 提取 token 用量（OpenAI 流式最后一帧可能带 usage）
+                                    usage = openai_chunk.get("usage")
+                                    if usage:
+                                        _tokens_prompt = usage.get("prompt_tokens", 0) or _tokens_prompt
+                                        _tokens_completion = usage.get("completion_tokens", 0) or _tokens_completion
+                                    events = convert_openai_chunk_to_anthropic(openai_chunk, external_model, _stream_state)
 
-                                # 如果转换函数没有发出 message_start（首 chunk 无 role），补发
-                                if not _sent_message_start:
-                                    if events and events[0]["event"] == "message_start":
-                                        _sent_message_start = True
-                                    else:
-                                        sse_msg = format_sse_event("message_start", {
-                                            "type": "message_start",
-                                            "message": {
-                                                "id": f"msg_{int(time.time())}",
-                                                "type": "message",
-                                                "role": "assistant",
-                                                "content": [],
-                                                "model": external_model,
-                                                "stop_reason": None,
-                                                "stop_sequence": None,
-                                                "usage": {"input_tokens": 0, "output_tokens": 0},
-                                            },
-                                        })
-                                        yield sse_msg
-                                        _sent_message_start = True
+                                    # 如果转换函数没有发出 message_start（首 chunk 无 role），补发
+                                    if not _sent_message_start:
+                                        if events and events[0]["event"] == "message_start":
+                                            _sent_message_start = True
+                                        else:
+                                            sse_msg = format_sse_event("message_start", {
+                                                "type": "message_start",
+                                                "message": {
+                                                    "id": f"msg_{int(time.time())}",
+                                                    "type": "message",
+                                                    "role": "assistant",
+                                                    "content": [],
+                                                    "model": external_model,
+                                                    "stop_reason": None,
+                                                    "stop_sequence": None,
+                                                    "usage": {"input_tokens": 0, "output_tokens": 0},
+                                                },
+                                            })
+                                            yield sse_msg
+                                            _sent_message_start = True
 
-                                for event in events:
-                                    if event["event"] == "message_stop":
-                                        _sent_finish = True
-                                    yield format_sse_event(event["event"], event["data"])
-                            except json.JSONDecodeError:
-                                continue
-                except Exception as e:
-                    logger.error(f"[ANTHROPIC] Stream error: {type(e).__name__}: {e}")
+                                    for event in events:
+                                        if event["event"] == "message_stop":
+                                            _sent_finish = True
+                                        yield format_sse_event(event["event"], event["data"])
+                                except json.JSONDecodeError:
+                                    continue
+                    except Exception as e:
+                        logger.error(f"[ANTHROPIC] Stream error: {type(e).__name__}: {e}")
 
-                # 如果后端没给 finish_reason，补发结束事件
-                if not _sent_finish:
-                    max_tool_idx = _stream_state.get("max_tool_index", 0)
-                    # 停止 thinking block（如果还没停过）
-                    if _stream_state.get("thinking_started") and not _stream_state.get("thinking_stopped"):
-                        yield format_sse_event("content_block_stop", {
-                            "type": "content_block_stop",
-                            "index": 0,
+                    # 如果后端没给 finish_reason，补发结束事件
+                    if not _sent_finish:
+                        max_tool_idx = _stream_state.get("max_tool_index", 0)
+                        # 停止 thinking block（如果还没停过）
+                        if _stream_state.get("thinking_started") and not _stream_state.get("thinking_stopped"):
+                            yield format_sse_event("content_block_stop", {
+                                "type": "content_block_stop",
+                                "index": 0,
+                            })
+                        # 停止 text block
+                        if _stream_state.get("text_started"):
+                            text_idx = 1 if _stream_state.get("thinking_started") else 0
+                            yield format_sse_event("content_block_stop", {
+                                "type": "content_block_stop",
+                                "index": text_idx,
+                            })
+                        # 停止 tool blocks
+                        _tool_start = (1 if _stream_state.get("thinking_started") else 0) + 1
+                        for i in range(_tool_start, max_tool_idx + 1):
+                            yield format_sse_event("content_block_stop", {
+                                "type": "content_block_stop",
+                                "index": i,
+                            })
+                        yield format_sse_event("message_delta", {
+                            "type": "message_delta",
+                            "delta": {"stop_reason": "end_turn", "stop_sequence": None},
+                            "usage": {"output_tokens": _tokens_completion},
                         })
-                    # 停止 text block
-                    if _stream_state.get("text_started"):
-                        text_idx = 1 if _stream_state.get("thinking_started") else 0
-                        yield format_sse_event("content_block_stop", {
-                            "type": "content_block_stop",
-                            "index": text_idx,
+                        yield format_sse_event("message_stop", {
+                            "type": "message_stop",
                         })
-                    # 停止 tool blocks
-                    _tool_start = (1 if _stream_state.get("thinking_started") else 0) + 1
-                    for i in range(_tool_start, max_tool_idx + 1):
-                        yield format_sse_event("content_block_stop", {
-                            "type": "content_block_stop",
-                            "index": i,
-                        })
-                    yield format_sse_event("message_delta", {
-                        "type": "message_delta",
-                        "delta": {"stop_reason": "end_turn", "stop_sequence": None},
-                        "usage": {"output_tokens": _tokens_completion},
-                    })
-                    yield format_sse_event("message_stop", {
-                        "type": "message_stop",
-                    })
-
-                # 流结束后记录日志
-                duration_ms = int((time.monotonic() - _stream_start) * 1000)
-                await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 200, _tokens_prompt, _tokens_completion, is_stream=True)
-                await broadcast_request_event(
-                    event_type="request_end", user_id=auth.user_id, model=external_model,
-                    latency_ms=duration_ms, status_code=200, is_stream=True,
-                )
+                finally:
+                    # 流结束后记录日志（即使客户端断开也记录）
+                    duration_ms = int((time.monotonic() - _stream_start) * 1000)
+                    await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 200, _tokens_prompt, _tokens_completion, is_stream=True)
+                    await broadcast_request_event(
+                        event_type="request_end", user_id=auth.user_id, model=external_model,
+                        latency_ms=duration_ms, status_code=200, is_stream=True,
+                    )
 
             return StreamingResponse(
                 anthropic_stream(),

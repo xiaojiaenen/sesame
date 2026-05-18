@@ -1,8 +1,31 @@
+import asyncio
 from collections.abc import AsyncGenerator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
+
+
+class SafeAsyncSession(AsyncSession):
+    """AsyncSession whose close() is shielded from cancellation.
+
+    When a request task is cancelled mid-flight, the pool connection must still
+    be returned.  Without shielding, the greenlet-based asyncmy bridge can raise
+    CancelledError inside do_terminate even though the pool already uses
+    asyncio.shield() -- leaving the connection checked out forever.
+    """
+
+    async def close(self):
+        try:
+            await asyncio.shield(AsyncSession.close(self))
+        except asyncio.CancelledError:
+            raise
+        except BaseException:
+            try:
+                await AsyncSession.close(self)
+            except BaseException:
+                pass
+
 
 engine = create_async_engine(
     settings.db_url,
@@ -11,8 +34,9 @@ engine = create_async_engine(
     max_overflow=40,
     pool_recycle=3600,
     pool_pre_ping=True,
+    pool_timeout=10,
 )
-async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+async_session = async_sessionmaker(engine, class_=SafeAsyncSession, expire_on_commit=False)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession]:

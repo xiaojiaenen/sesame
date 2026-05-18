@@ -136,46 +136,47 @@ async def responses_endpoint(request: Request):
                 nonlocal _tokens_prompt, _tokens_completion
 
                 try:
-                    async for line in result.body_iterator:
-                        line_str = line.decode("utf-8") if isinstance(line, bytes) else line
+                    try:
+                        async for line in result.body_iterator:
+                            line_str = line.decode("utf-8") if isinstance(line, bytes) else line
 
-                        if not line_str.startswith("data: "):
-                            continue
-                        data_str = line_str[6:].strip()
-                        if data_str == "[DONE]":
-                            break
+                            if not line_str.startswith("data: "):
+                                continue
+                            data_str = line_str[6:].strip()
+                            if data_str == "[DONE]":
+                                break
 
-                        try:
-                            openai_chunk = json.loads(data_str)
-                        except json.JSONDecodeError:
-                            continue
+                            try:
+                                openai_chunk = json.loads(data_str)
+                            except json.JSONDecodeError:
+                                continue
 
-                        # 提取 usage
-                        usage = openai_chunk.get("usage")
-                        if usage:
-                            _tokens_prompt = usage.get("prompt_tokens", 0) or _tokens_prompt
-                            _tokens_completion = usage.get("completion_tokens", 0) or _tokens_completion
+                            # 提取 usage
+                            usage = openai_chunk.get("usage")
+                            if usage:
+                                _tokens_prompt = usage.get("prompt_tokens", 0) or _tokens_prompt
+                                _tokens_completion = usage.get("completion_tokens", 0) or _tokens_completion
 
-                        # 转换为 Responses API 事件
-                        events = convert_openai_chunk_to_responses_events(openai_chunk, external_model, _state)
-                        for event in events:
-                            yield f"event: {event['type']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
+                            # 转换为 Responses API 事件
+                            events = convert_openai_chunk_to_responses_events(openai_chunk, external_model, _state)
+                            for event in events:
+                                yield f"event: {event['type']}\ndata: {json.dumps(event, ensure_ascii=False)}\n\n"
 
-                    # 发送 response.completed
-                    if _state.get("started"):
-                        completed_event = build_response_completed(_state, external_model)
-                        yield f"event: response.completed\ndata: {json.dumps(completed_event, ensure_ascii=False)}\n\n"
+                        # 发送 response.completed
+                        if _state.get("started"):
+                            completed_event = build_response_completed(_state, external_model)
+                            yield f"event: response.completed\ndata: {json.dumps(completed_event, ensure_ascii=False)}\n\n"
 
-                except Exception as e:
-                    logger.error(f"[RESPONSES] Stream error: {type(e).__name__}: {e}")
-
-                duration_ms = int((time.monotonic() - _stream_start) * 1000)
-                await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 200,
-                                   _tokens_prompt, _tokens_completion, is_stream=True)
-                await broadcast_request_event(
-                    event_type="request_end", user_id=auth.user_id, model=external_model,
-                    latency_ms=duration_ms, status_code=200, is_stream=True,
-                )
+                    except Exception as e:
+                        logger.error(f"[RESPONSES] Stream error: {type(e).__name__}: {e}")
+                finally:
+                    duration_ms = int((time.monotonic() - _stream_start) * 1000)
+                    await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 200,
+                                       _tokens_prompt, _tokens_completion, is_stream=True)
+                    await broadcast_request_event(
+                        event_type="request_end", user_id=auth.user_id, model=external_model,
+                        latency_ms=duration_ms, status_code=200, is_stream=True,
+                    )
 
             return StreamingResponse(
                 responses_stream(),

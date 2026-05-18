@@ -151,21 +151,23 @@ async def _proxy_request(request: Request, auth: AuthUser):
         async def wrapped_stream():
             tp = 0
             tc = 0
-            async for chunk in _orig_iter:
-                yield chunk
-                line = chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
-                if line.startswith("data: ") and line.strip() != "data: [DONE]":
-                    try:
-                        import json as _json
-                        data = _json.loads(line[6:])
-                        u = data.get("usage")
-                        if u:
-                            tp = u.get("prompt_tokens", 0) or tp
-                            tc = u.get("completion_tokens", 0) or tc
-                    except Exception:
-                        pass
-            duration_ms = int((time.monotonic() - _stream_start) * 1000)
-            await _log_request(auth.user_id, auth.key_id, external_model, True, 200, duration_ms, tp, tc)
+            try:
+                async for chunk in _orig_iter:
+                    yield chunk
+                    line = chunk.decode("utf-8") if isinstance(chunk, bytes) else chunk
+                    if line.startswith("data: ") and line.strip() != "data: [DONE]":
+                        try:
+                            import json as _json
+                            data = _json.loads(line[6:])
+                            u = data.get("usage")
+                            if u:
+                                tp = u.get("prompt_tokens", 0) or tp
+                                tc = u.get("completion_tokens", 0) or tc
+                        except Exception:
+                            pass
+            finally:
+                duration_ms = int((time.monotonic() - _stream_start) * 1000)
+                await _log_request(auth.user_id, auth.key_id, external_model, True, 200, duration_ms, tp, tc)
 
         result.body_iterator = wrapped_stream()
 

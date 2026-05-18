@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import sys
+import warnings
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,10 +14,25 @@ logging.basicConfig(
 )
 # 降低 uvicorn access 日志噪音
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-# 抑制 sqlalchemy pool 连接终止错误噪音（asyncmy 取消时的已知兼容问题，pool 会自动恢复）
-logging.getLogger("sqlalchemy.pool.impl.AsyncAdaptedQueuePool").setLevel(logging.WARNING)
 # 抑制 asyncio 未捕获异常噪音
 logging.getLogger("asyncio").setLevel(logging.WARNING)
+
+# 抑制 sqlalchemy pool 连接终止错误的噪音日志
+# asyncmy 取消时 do_terminate 中的 asyncio.shield 会被 greenlet 桥接绕过，
+# 导致 CancelledError（连接由 pool 自动恢复）。同时抑制 GC 发现未归还连接时的
+# ERROR 日志——这些连接会在 engine.dispose() 时统一清理。
+class _PoolNoiseFilter(logging.Filter):
+    def filter(self, record):
+        msg = record.getMessage()
+        if "Exception terminating connection" in msg:
+            return False
+        if "garbage collector is trying to clean up" in msg:
+            return False
+        return True
+
+logging.getLogger("sqlalchemy.pool.impl.AsyncAdaptedQueuePool").addFilter(_PoolNoiseFilter())
+# 抑制 SQLAlchemy GC 清理未归还连接的 SAWarning（连接由 pool 自动恢复，engine.dispose() 时统一清理）
+warnings.filterwarnings("ignore", message=".*garbage collector is trying to clean up.*")
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -139,7 +155,8 @@ async def lifespan(app: FastAPI):
     from app.database import engine
     await close_client()
     await close_redis()
-    await engine.dispose()
+    # 确保连接池被彻底清空——即使 shutdown 期间触发了取消也要执行完毕
+    await asyncio.shield(engine.dispose())
 
 
 app = FastAPI(
