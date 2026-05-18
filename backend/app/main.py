@@ -13,6 +13,10 @@ logging.basicConfig(
 )
 # 降低 uvicorn access 日志噪音
 logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+# 抑制 sqlalchemy pool 连接终止错误噪音（asyncmy 取消时的已知兼容问题，pool 会自动恢复）
+logging.getLogger("sqlalchemy.pool.impl.AsyncAdaptedQueuePool").setLevel(logging.WARNING)
+# 抑制 asyncio 未捕获异常噪音
+logging.getLogger("asyncio").setLevel(logging.WARNING)
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
@@ -129,8 +133,10 @@ async def lifespan(app: FastAPI):
     cookie_task.cancel()
     from app.services.proxy_service import close_client
     from app.cache import close_redis
+    from app.database import engine
     await close_client()
     await close_redis()
+    await engine.dispose()
 
 
 app = FastAPI(

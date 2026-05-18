@@ -28,23 +28,28 @@ async def _get_user_channel_cookie(user_id: str, channel_id: int) -> str | None:
     from app.crypto import decrypt
     from datetime import datetime
 
-    async with async_session() as db:
-        result = await db.execute(
-            select(UserChannelCookie).where(
-                and_(
-                    UserChannelCookie.user_id == user_id,
-                    UserChannelCookie.channel_id == channel_id,
-                    UserChannelCookie.status == "active",
+    try:
+        async with async_session() as db:
+            result = await db.execute(
+                select(UserChannelCookie).where(
+                    and_(
+                        UserChannelCookie.user_id == user_id,
+                        UserChannelCookie.channel_id == channel_id,
+                        UserChannelCookie.status == "active",
+                    )
                 )
             )
-        )
-        row = result.scalar_one_or_none()
-        if not row:
-            return None
-        # 检查过期
-        if row.expire_at and row.expire_at < now_beijing():
-            return None
-        return decrypt(row.cookie_encrypted)
+            row = result.scalar_one_or_none()
+            if not row:
+                return None
+            # 检查过期
+            if row.expire_at and row.expire_at < now_beijing():
+                return None
+            return decrypt(row.cookie_encrypted)
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        return None
 
 # Regex to detect OpenAI SSE format: data: {"id":"...","choices":[...]}
 _OPENAI_SSE_RE = re.compile(r'"choices"\s*:\s*\[')
