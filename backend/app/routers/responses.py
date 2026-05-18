@@ -88,15 +88,30 @@ async def responses_endpoint(request: Request):
         is_stream=stream,
     )
 
+    # 检查用户偏好
+    from app.services.user_pref_cache import get_user_prefs
+    pref_channel_id, load_balance = get_user_prefs(auth.user_id)
+    preferred_channel_id = pref_channel_id if not load_balance else None
+
     try:
         if stream:
-            result = await proxy_service.proxy_request_with_retry(
-                cookie="",
-                raw_body=openai_body,
-                target_model=external_model,
-                stream=True,
-                user_id=auth.user_id,
-            )
+            if preferred_channel_id:
+                result = await proxy_service.proxy_request(
+                    cookie="",
+                    raw_body=openai_body,
+                    target_model=external_model,
+                    stream=True,
+                    user_id=auth.user_id,
+                    channel_id=preferred_channel_id,
+                )
+            else:
+                result = await proxy_service.proxy_request_with_retry(
+                    cookie="",
+                    raw_body=openai_body,
+                    target_model=external_model,
+                    stream=True,
+                    user_id=auth.user_id,
+                )
 
             # 后端返回 JSON 而非 SSE
             if isinstance(result, dict):
@@ -170,13 +185,23 @@ async def responses_endpoint(request: Request):
 
         else:
             # 非流式
-            result = await proxy_service.proxy_request_with_retry(
-                cookie="",
-                raw_body=openai_body,
-                target_model=external_model,
-                stream=False,
-                user_id=auth.user_id,
-            )
+            if preferred_channel_id:
+                result = await proxy_service.proxy_request(
+                    cookie="",
+                    raw_body=openai_body,
+                    target_model=external_model,
+                    stream=False,
+                    user_id=auth.user_id,
+                    channel_id=preferred_channel_id,
+                )
+            else:
+                result = await proxy_service.proxy_request_with_retry(
+                    cookie="",
+                    raw_body=openai_body,
+                    target_model=external_model,
+                    stream=False,
+                    user_id=auth.user_id,
+                )
 
             if isinstance(result, dict):
                 resp = convert_openai_response_to_responses(result, external_model)

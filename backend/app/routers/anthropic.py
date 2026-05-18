@@ -124,6 +124,11 @@ async def anthropic_messages(
     openai_req["model"] = external_model
     openai_body = json.dumps(openai_req).encode()
 
+    # 检查用户偏好
+    from app.services.user_pref_cache import get_user_prefs
+    pref_channel_id, load_balance = get_user_prefs(auth.user_id)
+    preferred_channel_id = pref_channel_id if not load_balance else None
+
     # 广播请求开始事件
     await broadcast_request_event(
         event_type="request_start",
@@ -136,7 +141,17 @@ async def anthropic_messages(
     try:
         if stream:
             # 流式响应 - 需要转换格式
-            result = await proxy_service.proxy_request_with_retry(
+            if preferred_channel_id:
+                result = await proxy_service.proxy_request(
+                    cookie=cookie,
+                    raw_body=openai_body,
+                    target_model=external_model,
+                    stream=True,
+                    user_id=auth.user_id,
+                    channel_id=preferred_channel_id,
+                )
+            else:
+                result = await proxy_service.proxy_request_with_retry(
                 cookie=cookie,
                 raw_body=openai_body,
                 target_model=external_model,
@@ -271,13 +286,23 @@ async def anthropic_messages(
             )
         else:
             # 非流式响应
-            result = await proxy_service.proxy_request_with_retry(
-                cookie=cookie,
-                raw_body=openai_body,
-                target_model=external_model,
-                stream=False,
-                user_id=auth.user_id,
-            )
+            if preferred_channel_id:
+                result = await proxy_service.proxy_request(
+                    cookie=cookie,
+                    raw_body=openai_body,
+                    target_model=external_model,
+                    stream=False,
+                    user_id=auth.user_id,
+                    channel_id=preferred_channel_id,
+                )
+            else:
+                result = await proxy_service.proxy_request_with_retry(
+                    cookie=cookie,
+                    raw_body=openai_body,
+                    target_model=external_model,
+                    stream=False,
+                    user_id=auth.user_id,
+                )
 
             # 转换响应格式
             if isinstance(result, dict):
