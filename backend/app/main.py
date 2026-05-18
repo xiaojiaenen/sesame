@@ -126,6 +126,9 @@ async def lifespan(app: FastAPI):
         logger.info("API keys loaded.")
         await load_channels_to_cache(db)
         logger.info("Channels loaded.")
+        from app.services.user_pref_cache import load_user_prefs
+        await load_user_prefs(db)
+        logger.info("User preferences cached.")
 
     cookie_task = asyncio.create_task(_cookie_check_loop())
     logger.info("Application startup complete.")

@@ -404,6 +404,12 @@ async def update_preferences(
     if update_data:
         await db.execute(update(User).where(User.user_id == auth.user_id).values(**update_data))
         await db.commit()
+        from app.services.user_pref_cache import set_user_prefs
+        # 重新读取以保持缓存与 DB 一致
+        result = await db.execute(select(User).where(User.user_id == auth.user_id))
+        user = result.scalar_one_or_none()
+        if user:
+            set_user_prefs(auth.user_id, user.preferred_channel_id, user.load_balance_enabled if user.load_balance_enabled is not None else True)
     return {"status": "ok"}
 
 

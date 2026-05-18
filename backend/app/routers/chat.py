@@ -58,15 +58,10 @@ async def _proxy_request(request: Request, auth: AuthUser):
     external_model = body.get("model", "")
     stream = body.get("stream", False)
 
-    # 检查用户偏好：是否使用指定渠道
-    preferred_channel_id = None
-    async with async_session() as db:
-        from app.models.db_models import User
-        from sqlalchemy import select
-        result = await db.execute(select(User).where(User.user_id == auth.user_id))
-        user_row = result.scalar_one_or_none()
-        if user_row and not user_row.load_balance_enabled and user_row.preferred_channel_id:
-            preferred_channel_id = user_row.preferred_channel_id
+    # 检查用户偏好：是否使用指定渠道（从内存缓存读取，无 DB 查询）
+    from app.services.user_pref_cache import get_user_prefs
+    pref_channel_id, load_balance = get_user_prefs(auth.user_id)
+    preferred_channel_id = pref_channel_id if not load_balance else None
 
     # 检查是否有可用渠道
     channel, backend_model = channel_service.select_channel(external_model)

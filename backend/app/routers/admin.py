@@ -62,6 +62,8 @@ async def disable_user(
     disabled = await auth_service.disable_user(db, user_id)
     if not disabled:
         raise HTTPException(status_code=404, detail="用户不存在")
+    from app.services.user_pref_cache import remove_user_prefs
+    remove_user_prefs(user_id)
     return {"status": "disabled", "user_id": user_id}
 
 
