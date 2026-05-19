@@ -1,4 +1,5 @@
-const getBaseUrl = () => process.env.NEXT_PUBLIC_API_URL || "";
+export const getBaseUrl = () =>
+  process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? window.location.origin : "");
 
 export const apiFetch = async (url: string, options: RequestInit = {}) => {
   const token = typeof window !== "undefined" ? localStorage.getItem("sesame_token") : null;

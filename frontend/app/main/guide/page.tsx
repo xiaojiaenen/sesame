@@ -1,8 +1,9 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { copyToClipboard } from "@/lib/clipboard";
+import { getBaseUrl } from "@/lib/api";
 import { motion } from "motion/react";
 import { PageHeader } from "@/components/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -58,11 +59,7 @@ function StepItem({ number, title, children }: { number: number; title: string; 
 }
 
 export default function GuidePage() {
-  const [baseUrl, setBaseUrl] = useState<string>("");
-
-  useEffect(() => {
-    setBaseUrl(process.env.NEXT_PUBLIC_API_URL || (typeof window !== "undefined" ? window.location.origin : ""));
-  }, []);
+  const baseUrl = getBaseUrl();
 
   return (
     <div className="space-y-6">

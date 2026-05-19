@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
+import { getBaseUrl } from "@/lib/api";
 import { Activity, Wifi, WifiOff, Trash2, Clock, Zap, AlertTriangle, Radio } from "lucide-react";
 
 interface RequestEvent {
@@ -60,7 +61,7 @@ export default function MonitorPage() {
       wsRef.current = null;
     }
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+    const apiUrl = getBaseUrl();
     const wsUrl = apiUrl.replace(/^http/, 'ws') + '/admin/ws/monitor';
 
     try {
