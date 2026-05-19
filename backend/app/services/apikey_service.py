@@ -51,7 +51,10 @@ async def create_api_key(
     await db.commit()
     await db.refresh(api_key)
 
-    await _cache_key(api_key)
+    from app.models.db_models import User
+    user_result = await db.execute(select(User.role).where(User.user_id == user_id))
+    role = user_result.scalar_one_or_none() or "user"
+    await _cache_key(api_key, role)
     return full_key, api_key
 
 
@@ -101,6 +104,22 @@ async def delete_api_key(db: AsyncSession, key_id: int, user_id: str | None) -> 
     await db.commit()
     await _invalidate_cache(key_id)
     return True
+
+
+async def get_random_active_key(exclude_key_id: int | None = None) -> dict | None:
+    """从 Redis 缓存中随机选取一个活跃的 API Key（非自身）。"""
+    cache = get_cache()
+    candidates: list[dict] = []
+    keys = await cache.get_all_hash_keys()
+    for k in keys:
+        if k.startswith(KEY_HASH_PREFIX):
+            data = await cache.get(k)
+            if data and data.get("key_id") and data["key_id"] != exclude_key_id:
+                candidates.append(data)
+    if not candidates:
+        return None
+    import random
+    return random.choice(candidates)
 
 
 async def validate_key(token: str) -> dict | None:
@@ -157,17 +176,27 @@ async def disable_user_keys(db: AsyncSession, user_id: str):
 
 
 async def load_keys_to_cache(db: AsyncSession):
+    from app.models.db_models import User
     result = await db.execute(select(ApiKey).where(ApiKey.is_active == True))
-    for key in result.scalars().all():
-        await _cache_key(key)
+    keys = result.scalars().all()
+    # 批量查询用户角色
+    user_ids = {k.user_id for k in keys}
+    user_map: dict[str, str] = {}
+    if user_ids:
+        user_result = await db.execute(select(User.user_id, User.role).where(User.user_id.in_(user_ids)))
+        for row in user_result:
+            user_map[row.user_id] = row.role
+    for key in keys:
+        await _cache_key(key, user_map.get(key.user_id, "user"))
 
 
-async def _cache_key(key: ApiKey):
+async def _cache_key(key: ApiKey, role: str = "user"):
     cache = get_cache()
     expire_ts = key.expire_at.timestamp() if key.expire_at else None
     data = {
         "key_id": key.id,
         "user_id": key.user_id,
+        "role": role,
         "max_qpm": key.max_qpm,
         "expire_ts": expire_ts,
     }

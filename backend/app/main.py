@@ -28,6 +28,8 @@ class _PoolNoiseFilter(logging.Filter):
             return False
         if "garbage collector is trying to clean up" in msg:
             return False
+        if "Not connected" in msg:
+            return False
         return True
 
 logging.getLogger("sqlalchemy.pool.impl.AsyncAdaptedQueuePool").addFilter(_PoolNoiseFilter())

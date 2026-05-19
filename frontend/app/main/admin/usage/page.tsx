@@ -124,7 +124,7 @@ export default function UsagePage() {
     completion: Math.round(d.total_completion_tokens / 1000),
     latency: Math.round(d.avg_latency_ms),
     errors: d.error_count,
-  })).reverse();
+  }));
 
   const modelChartData = modelStats.slice(0, 8).map(m => ({
     name: m.model.length > 16 ? m.model.slice(0, 16) + '…' : m.model,

@@ -9,6 +9,69 @@ from app.models.db_models import RequestLog, UsageStats
 from app.utils import now_beijing
 
 
+async def log_request_start(
+    db: AsyncSession,
+    user_id: str,
+    key_id: int | None = None,
+    channel_id: int | None = None,
+    model: str | None = None,
+    internal_model: str | None = None,
+    is_stream: bool = False,
+    api_format: str | None = None,
+) -> int:
+    """流式请求开始时写入占位日志，返回 log_id 供后续更新"""
+    log = RequestLog(
+        user_id=user_id,
+        key_id=key_id,
+        channel_id=channel_id,
+        model=model,
+        internal_model=internal_model,
+        tokens_prompt=0,
+        tokens_completion=0,
+        latency_ms=None,
+        status_code=None,
+        is_stream=is_stream,
+        api_format=api_format,
+    )
+    db.add(log)
+    await db.flush()
+    log_id = log.id
+    await db.commit()
+    return log_id
+
+
+async def log_request_complete(
+    db: AsyncSession,
+    log_id: int,
+    user_id: str,
+    key_id: int | None = None,
+    model: str | None = None,
+    tokens_prompt: int = 0,
+    tokens_completion: int = 0,
+    latency_ms: int | None = None,
+    status_code: int | None = None,
+    error_message: str | None = None,
+) -> None:
+    """流式请求结束后更新日志并写入用量统计"""
+    log = await db.get(RequestLog, log_id)
+    if log is None:
+        return
+    log.tokens_prompt = tokens_prompt
+    log.tokens_completion = tokens_completion
+    log.latency_ms = latency_ms
+    log.status_code = status_code
+    log.error_message = error_message
+    await db.flush()
+
+    await _upsert_usage_atomic(
+        db, user_id, key_id or 0, model,
+        tokens_prompt + tokens_completion,
+        tokens_prompt, tokens_completion,
+        latency_ms, status_code
+    )
+    await db.commit()
+
+
 async def log_request(
     db: AsyncSession,
     user_id: str,

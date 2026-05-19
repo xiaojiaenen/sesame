@@ -20,7 +20,11 @@ class AuthUser:
 async def get_api_key_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> AuthUser:
-    """Authenticate via API Key (Bearer sk-sesame-xxx)."""
+    """Authenticate via API Key (Bearer sk-sesame-xxx).
+
+    Admin keys randomly select a system API key for each request,
+    distributing usage across all keys while keeping attribution to the admin.
+    """
     if not credentials:
         raise HTTPException(status_code=401, detail="Missing Authorization header")
 
@@ -30,6 +34,17 @@ async def get_api_key_user(
         key_info = await validate_key(token)
         if not key_info:
             raise HTTPException(status_code=401, detail="Invalid or expired API key")
+
+        if key_info.get("role") == "admin":
+            from app.services.apikey_service import get_random_active_key
+            random_key = await get_random_active_key(exclude_key_id=key_info["key_id"])
+            if random_key:
+                return AuthUser(
+                    user_id=key_info["user_id"],
+                    key_id=random_key["key_id"],
+                    max_qpm=random_key["max_qpm"],
+                )
+
         return AuthUser(
             user_id=key_info["user_id"],
             key_id=key_info["key_id"],
