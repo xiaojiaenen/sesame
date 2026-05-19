@@ -26,6 +26,8 @@ class _PoolNoiseFilter(logging.Filter):
         msg = record.getMessage()
         if "Exception terminating connection" in msg:
             return False
+        if "Exception during reset or similar" in msg:
+            return False
         if "garbage collector is trying to clean up" in msg:
             return False
         if "Not connected" in msg:

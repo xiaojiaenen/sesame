@@ -1,6 +1,7 @@
 import json
 import logging
 import time
+import uuid
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
@@ -11,9 +12,9 @@ from app.config import settings
 from app.auth import AuthUser, get_api_key_user
 from app.database import async_session
 from app.services import apikey_service, channel_service, proxy_service, rate_limit_service, log_service
+from app.services.proxy_service import current_request_id
 from app.services.cache_service import (
     acquire_concurrency, release_concurrency,
-    acquire_dedup, wait_dedup_result, store_dedup_result,
     get_cached, set_cached, compute_fingerprint,
 )
 from app.services.websocket_service import broadcast_request_event
@@ -64,6 +65,9 @@ async def _proxy_request(request: Request, auth: AuthUser):
     external_model = body.get("model", "")
     stream = body.get("stream", False)
 
+    req_id = uuid.uuid4().hex[:12]
+    current_request_id.set(req_id)
+
     # 检查用户偏好：是否使用指定渠道（从内存缓存读取，无 DB 查询）
     from app.services.user_pref_cache import get_user_prefs
     pref_channel_id, load_balance = get_user_prefs(auth.user_id)
@@ -80,7 +84,7 @@ async def _proxy_request(request: Request, auth: AuthUser):
             content={"error": {"message": "没有可用的 API 渠道，请先在管理后台创建渠道", "type": "sesame_error"}},
         )
 
-    # ── 三层防护：并发控制 → 去重 → 缓存 ──
+    # ── 两层防护：并发控制 → 缓存 ──
     fingerprint = compute_fingerprint(body, auth.user_id)
 
     # 1. 并发控制
@@ -91,30 +95,8 @@ async def _proxy_request(request: Request, auth: AuthUser):
                 content={"error": {"message": "并发请求过多，请稍后重试", "type": "concurrency_error"}},
             )
 
-    # 2. 请求去重 + 3. 精确缓存（仅非流式）
+    # 2. 精确缓存（仅非流式）
     if not stream:
-        if not await acquire_dedup(fingerprint, settings.dedup_ttl_seconds):
-            dedup_result = await wait_dedup_result(fingerprint, timeout=3.0)
-            if dedup_result:
-                logger.info(f"[CHAT] DEDUP_HIT model={external_model} user={auth.user_id}")
-                duration_ms = int((time.monotonic() - start) * 1000)
-                tokens_prompt = dedup_result.get("usage", {}).get("prompt_tokens", 0)
-                tokens_completion = dedup_result.get("usage", {}).get("completion_tokens", 0)
-                await _log_request(auth.user_id, auth.key_id, external_model, False, 200, duration_ms, tokens_prompt, tokens_completion)
-                await broadcast_request_event(
-                    event_type="request_end", user_id=auth.user_id, model=external_model,
-                    latency_ms=duration_ms, status_code=200, is_stream=False,
-                )
-                if auth.key_id:
-                    await release_concurrency(auth.key_id)
-                return JSONResponse(content=dedup_result)
-            if auth.key_id:
-                await release_concurrency(auth.key_id)
-            return JSONResponse(
-                status_code=429,
-                content={"error": {"message": "重复请求，请稍后重试", "type": "dedup_error"}},
-            )
-
         cached = await get_cached(fingerprint)
         if cached:
             logger.info(f"[CHAT] CACHE_HIT model={external_model} user={auth.user_id}")
@@ -126,7 +108,6 @@ async def _proxy_request(request: Request, auth: AuthUser):
                 event_type="request_end", user_id=auth.user_id, model=external_model,
                 latency_ms=duration_ms, status_code=200, is_stream=False,
             )
-            await store_dedup_result(fingerprint, cached)
             if auth.key_id:
                 await release_concurrency(auth.key_id)
             return JSONResponse(content=cached)
@@ -221,7 +202,6 @@ async def _proxy_request(request: Request, auth: AuthUser):
 
         # 写入缓存 + 更新去重结果
         await set_cached(fingerprint, result, settings.cache_ttl_seconds)
-        await store_dedup_result(fingerprint, result)
     else:
         # 替换 body_iterator 而非创建新 StreamingResponse，避免并发下 generator 被重复消费
         _stream_start = start
@@ -286,11 +266,16 @@ async def _log_request(user_id, key_id, external_model, stream, status_code, dur
                 error_message=error_message,
             )
 
+    import asyncio
     try:
-        await _write()
+        await asyncio.shield(_write())
+    except asyncio.CancelledError:
+        raise
     except Exception as e:
         logger.warning(f"First log attempt failed: {e}, retrying...")
         try:
-            await _write()
+            await asyncio.shield(_write())
+        except asyncio.CancelledError:
+            raise
         except Exception as e2:
             logger.error(f"Failed to log request after retry: {e2}")

@@ -3,6 +3,7 @@
 import json
 import logging
 import time
+import uuid
 
 logger = logging.getLogger("sesame.responses")
 
@@ -13,10 +14,10 @@ from app.config import settings
 from app.auth import AuthUser
 from app.database import async_session
 from app.services import channel_service, proxy_service, rate_limit_service, log_service
+from app.services.proxy_service import current_request_id
 from app.services.websocket_service import broadcast_request_event
 from app.services.cache_service import (
     acquire_concurrency, release_concurrency,
-    acquire_dedup, wait_dedup_result, store_dedup_result,
     get_cached, set_cached, compute_fingerprint,
 )
 from app.services.responses_format import (
@@ -75,6 +76,9 @@ async def responses_endpoint(request: Request):
     external_model = responses_req.get("model", "")
     stream = responses_req.get("stream", False)
 
+    req_id = uuid.uuid4().hex[:12]
+    current_request_id.set(req_id)
+
     # 选择渠道
     channel, _ = channel_service.select_channel(external_model)
     if not channel:
@@ -91,7 +95,7 @@ async def responses_endpoint(request: Request):
     pref_channel_id, load_balance = get_user_prefs(auth.user_id)
     preferred_channel_id = pref_channel_id if not load_balance else None
 
-    # ── 三层防护：并发控制 → 去重 → 缓存 ──
+    # ── 两层防护：并发控制 → 缓存 ──
     fingerprint = compute_fingerprint(openai_req, auth.user_id)
 
     # 1. 并发控制
@@ -104,33 +108,8 @@ async def responses_endpoint(request: Request):
                 },
             )
 
-    # 2. 请求去重 + 3. 精确缓存（仅非流式）
+    # 2. 精确缓存（仅非流式）
     if not stream:
-        if not await acquire_dedup(fingerprint, settings.dedup_ttl_seconds):
-            dedup_result = await wait_dedup_result(fingerprint, timeout=3.0)
-            if dedup_result:
-                logger.info(f"[RESPONSES] DEDUP_HIT model={external_model} user={auth.user_id}")
-                resp = convert_openai_response_to_responses(dedup_result, external_model)
-                duration_ms = int((time.monotonic() - start) * 1000)
-                tokens_prompt = dedup_result.get("usage", {}).get("prompt_tokens", 0)
-                tokens_completion = dedup_result.get("usage", {}).get("completion_tokens", 0)
-                await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 200, tokens_prompt, tokens_completion)
-                await broadcast_request_event(
-                    event_type="request_end", user_id=auth.user_id, model=external_model,
-                    latency_ms=duration_ms, status_code=200, is_stream=False,
-                )
-                if auth.key_id:
-                    await release_concurrency(auth.key_id)
-                return JSONResponse(content=resp)
-            if auth.key_id:
-                await release_concurrency(auth.key_id)
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "error": {"type": "rate_limit_error", "message": "重复请求，请稍后重试"}
-                },
-            )
-
         cached = await get_cached(fingerprint)
         if cached:
             logger.info(f"[RESPONSES] CACHE_HIT model={external_model} user={auth.user_id}")
@@ -143,7 +122,6 @@ async def responses_endpoint(request: Request):
                 event_type="request_end", user_id=auth.user_id, model=external_model,
                 latency_ms=duration_ms, status_code=200, is_stream=False,
             )
-            await store_dedup_result(fingerprint, cached)
             if auth.key_id:
                 await release_concurrency(auth.key_id)
             return JSONResponse(content=resp)
@@ -188,9 +166,8 @@ async def responses_endpoint(request: Request):
                     latency_ms=duration_ms, status_code=200, is_stream=False,
                 )
 
-                # 写入缓存 + 更新去重（stream 请求但后端返回非流式 dict）
+                # 写入缓存（stream 请求但后端返回非流式 dict）
                 await set_cached(fingerprint, result, settings.cache_ttl_seconds)
-                await store_dedup_result(fingerprint, result)
 
                 return JSONResponse(content=resp)
 
@@ -283,9 +260,8 @@ async def responses_endpoint(request: Request):
                     latency_ms=duration_ms, status_code=200, is_stream=False,
                 )
 
-                # 写入缓存 + 更新去重结果
+                # 写入缓存
                 await set_cached(fingerprint, result, settings.cache_ttl_seconds)
-                await store_dedup_result(fingerprint, result)
 
                 import asyncio
                 if auth.key_id:
@@ -344,12 +320,17 @@ async def _log_request(user_id, key_id, model, duration_ms, status_code,
                 error_message=error_message,
             )
 
+    import asyncio as _asyncio
     try:
-        await _write()
+        await _asyncio.shield(_write())
+    except _asyncio.CancelledError:
+        raise
     except Exception as e:
         logger.warning(f"First log attempt failed: {e}, retrying...")
         try:
-            await _write()
+            await _asyncio.shield(_write())
+        except _asyncio.CancelledError:
+            raise
         except Exception as e2:
             logging.getLogger("sesame").error(f"[RESPONSES] Failed to log request after retry: {e2}")
 
