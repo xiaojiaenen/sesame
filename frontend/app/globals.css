@@ -228,13 +228,57 @@
 /* ── Code block ── */
 .code-block {
   font-family: var(--font-mono), ui-monospace, monospace;
-  background: oklch(0.17 0.015 250);
+  background: oklch(0.15 0.015 255);
   color: oklch(0.92 0.005 247);
   border-radius: var(--radius-lg);
-  padding: 1rem;
+  padding: 1.25rem;
   font-size: 0.8125rem;
-  line-height: 1.6;
+  line-height: 1.7;
   overflow-x: auto;
+  border: 1px solid oklch(0.25 0.01 250);
+}
+
+.dark .code-block {
+  background: oklch(0.12 0.01 253);
+  border-color: oklch(0.22 0.01 253);
+}
+
+/* Syntax tokens */
+.token-plain { color: oklch(0.85 0.01 250); }
+.token-keyword { color: oklch(0.72 0.16 170); }
+.token-string { color: oklch(0.72 0.14 85); }
+.token-flag { color: oklch(0.68 0.16 290); }
+.token-header { color: oklch(0.68 0.16 210); }
+.token-url { color: oklch(0.65 0.16 250); text-decoration: underline; text-underline-offset: 2px; }
+.token-comment { color: oklch(0.52 0.03 250); font-style: italic; }
+.token-json-key { color: oklch(0.68 0.15 210); }
+.token-json-string { color: oklch(0.72 0.14 85); }
+.token-json-bool { color: oklch(0.62 0.18 300); }
+.token-json-num { color: oklch(0.68 0.16 25); }
+
+.dark .token-plain { color: oklch(0.88 0.008 250); }
+.dark .token-keyword { color: oklch(0.75 0.16 170); }
+.dark .token-string { color: oklch(0.75 0.14 85); }
+.dark .token-flag { color: oklch(0.72 0.16 290); }
+.dark .token-header { color: oklch(0.72 0.16 210); }
+.dark .token-url { color: oklch(0.7 0.16 250); }
+.dark .token-comment { color: oklch(0.5 0.03 250); }
+.dark .token-json-key { color: oklch(0.72 0.15 210); }
+.dark .token-json-string { color: oklch(0.75 0.14 85); }
+.dark .token-json-bool { color: oklch(0.68 0.18 300); }
+.dark .token-json-num { color: oklch(0.72 0.16 25); }
+
+/* ── Dark mode table fix ── */
+.dark [data-slot="table-row"] {
+  border-bottom-color: oklch(0.28 0.015 250);
+}
+
+.dark [data-slot="table-header"] [data-slot="table-row"] {
+  border-bottom-color: oklch(0.32 0.015 250);
+}
+
+.dark [data-slot="table-container"] {
+  --table-border: oklch(0.28 0.015 250);
 }
 
 /* ── Reduced motion ── */

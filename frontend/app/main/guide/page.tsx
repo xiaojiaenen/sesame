@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { CodeBlock } from "@/components/code-block";
 
 function CopyableCode({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -131,8 +132,7 @@ export default function GuidePage() {
                 <div className="text-sm font-medium text-foreground">端点</div>
                 <CopyableCode text={`${baseUrl}/v1/chat/completions`} />
                 <div className="text-sm font-medium text-foreground mt-3">请求示例</div>
-                <pre className="p-4 bg-slate-900 text-slate-100 rounded-lg text-sm overflow-x-auto">
-{`curl ${baseUrl}/v1/chat/completions \\
+                <CodeBlock language="bash" code={`curl ${baseUrl}/v1/chat/completions \\
   -H "Authorization: Bearer YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -141,15 +141,13 @@ export default function GuidePage() {
       {"role": "user", "content": "Hello!"}
     ],
     "stream": false
-  }'`}
-                </pre>
+  }'`} />
               </TabsContent>
               <TabsContent value="anthropic" className="space-y-3 mt-0">
                 <div className="text-sm font-medium text-foreground">端点</div>
                 <CopyableCode text={`${baseUrl}/v1/messages`} />
                 <div className="text-sm font-medium text-foreground mt-3">请求示例</div>
-                <pre className="p-4 bg-slate-900 text-slate-100 rounded-lg text-sm overflow-x-auto">
-{`curl ${baseUrl}/v1/messages \\
+                <CodeBlock language="bash" code={`curl ${baseUrl}/v1/messages \\
   -H "x-api-key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -H "anthropic-version: 2023-06-01" \\
@@ -160,8 +158,7 @@ export default function GuidePage() {
       {"role": "user", "content": "Hello!"}
     ],
     "stream": false
-  }'`}
-                </pre>
+  }'`} />
                 <p className="text-xs text-muted-foreground">
                   Anthropic 格式使用 <code className="px-1 py-0.5 bg-muted rounded text-xs">x-api-key</code> 或 <code className="px-1 py-0.5 bg-muted rounded text-xs">Authorization: Bearer</code> 传递 Key。
                 </p>

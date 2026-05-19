@@ -8,7 +8,25 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
-import { Eye, EyeOff, Lock, User, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Lock, User, ArrowRight, Sparkles } from "lucide-react";
+
+function GridPattern() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div
+        className="absolute inset-0 opacity-[0.03] dark:opacity-[0.06]"
+        style={{
+          backgroundImage: `
+            linear-gradient(var(--border) 1px, transparent 1px),
+            linear-gradient(90deg, var(--border) 1px, transparent 1px)
+          `,
+          backgroundSize: "48px 48px",
+          maskImage: "radial-gradient(ellipse 80% 60% at 50% 40%, black 40%, transparent 70%)",
+        }}
+      />
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const [userId, setUserId] = useState("");
@@ -42,110 +60,171 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-primary/10" />
-      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-background">
+      {/* Background atmosphere */}
+      <GridPattern />
+      <div className="absolute top-[-20%] left-[10%] w-[600px] h-[600px] bg-primary/3 rounded-full blur-[120px]" />
+      <div className="absolute bottom-[-10%] right-[5%] w-[500px] h-[500px] bg-violet-500/3 rounded-full blur-[120px]" />
+      <div className="absolute top-[40%] right-[20%] w-[300px] h-[300px] bg-amber-500/2 rounded-full blur-[100px]" />
 
-      <motion.div {...fadeInUp} className="w-full max-w-md mx-4 relative z-10">
-        {/* Card */}
-        <div className="bg-card/80 backdrop-blur-xl rounded-2xl shadow-2xl ring-1 ring-border/50 p-8">
-          {/* Logo */}
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-5 shadow-lg shadow-primary/10">
-              <img src="/logo.svg" alt="Sesame" className="w-12 h-12" />
+      <div className="w-full max-w-md mx-4 relative z-10">
+        {/* Branding */}
+        <motion.div
+          {...fadeInUp}
+          className="text-center mb-8"
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="inline-flex items-center gap-3 mb-5"
+          >
+            <div className="relative">
+              <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-xl" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 ring-1 ring-primary/20 flex items-center justify-center relative shadow-lg shadow-primary/10">
+                <img src="/logo.svg" alt="Sesame" className="w-9 h-9" />
+              </div>
             </div>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">
-              Sesame
-            </h1>
-            <p className="text-sm text-muted-foreground mt-1.5">
-              芝麻智门 · AI 网关
-            </p>
+            <h1 className="text-3xl font-bold text-foreground tracking-tight">Sesame</h1>
+          </motion.div>
+          <motion.p
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.4 }}
+            className="text-muted-foreground text-sm"
+          >
+            AI 网关 · 统一接入 · 智能路由
+          </motion.p>
+          <motion.p
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18, duration: 0.4 }}
+            className="text-muted-foreground/50 text-xs mt-1.5"
+          >
+            芝麻智门 — 连接每一份智能
+          </motion.p>
+        </motion.div>
+
+        {/* Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.99 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ delay: 0.15, duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+          className="bg-card/70 backdrop-blur-2xl rounded-2xl shadow-2xl ring-1 ring-border/40 overflow-hidden"
+        >
+          <div className="p-8">
+            <div className="mb-7">
+              <h2 className="text-lg font-semibold text-foreground">欢迎回来</h2>
+              <p className="text-sm text-muted-foreground mt-1">登录您的账户以继续</p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-5">
+              <motion.div
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.25, duration: 0.35 }}
+                className="space-y-2"
+              >
+                <Label htmlFor="userId" className="text-sm font-medium">
+                  用户名
+                </Label>
+                <div className="relative">
+                  <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors duration-200 ${
+                    focusedField === "userId" ? "text-primary" : "text-muted-foreground/60"
+                  }`}>
+                    <User className="w-4 h-4" />
+                  </div>
+                  <Input
+                    id="userId"
+                    placeholder="输入用户名"
+                    value={userId}
+                    onChange={(e) => setUserId(e.target.value)}
+                    onFocus={() => setFocusedField("userId")}
+                    onBlur={() => setFocusedField(null)}
+                    required
+                    className={`h-11 pl-10 rounded-xl transition-all duration-200 ${
+                      focusedField === "userId" ? "border-primary ring-2 ring-primary/10" : "border-border/60"
+                    }`}
+                  />
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.33, duration: 0.35 }}
+                className="space-y-2"
+              >
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password" className="text-sm font-medium">
+                    密码
+                  </Label>
+                </div>
+                <div className="relative">
+                  <div className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors duration-200 ${
+                    focusedField === "password" ? "text-primary" : "text-muted-foreground/60"
+                  }`}>
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="输入密码"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onFocus={() => setFocusedField("password")}
+                    onBlur={() => setFocusedField(null)}
+                    required
+                    className={`h-11 pl-10 pr-10 rounded-xl transition-all duration-200 ${
+                      focusedField === "password" ? "border-primary ring-2 ring-primary/10" : "border-border/60"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/60 hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.42, duration: 0.35 }}
+              >
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full h-11 font-medium rounded-xl bg-gradient-to-r from-primary to-emerald-500 hover:from-primary/95 hover:to-emerald-500/90 shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/25 transition-all duration-300 mt-2"
+                >
+                  {isLoading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      登录中...
+                    </div>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      登录 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                    </span>
+                  )}
+                </Button>
+              </motion.div>
+            </form>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="userId" className="text-sm font-medium">
-                用户名
-              </Label>
-              <div className="relative">
-                <div className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
-                  focusedField === "userId" ? "text-primary" : "text-muted-foreground"
-                }`}>
-                  <User className="w-4 h-4" />
-                </div>
-                <Input
-                  id="userId"
-                  placeholder="输入用户名"
-                  value={userId}
-                  onChange={(e) => setUserId(e.target.value)}
-                  onFocus={() => setFocusedField("userId")}
-                  onBlur={() => setFocusedField(null)}
-                  required
-                  className={`h-11 pl-10 transition-all duration-200 ${
-                    focusedField === "userId" ? "border-primary ring-2 ring-primary/15" : ""
-                  }`}
-                />
-              </div>
+          {/* Footer */}
+          <div className="px-8 py-4 bg-muted/30 border-t border-border/40">
+            <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground/60">
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3 h-3" />
+                Sesame v1.1.0
+              </span>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium">
-                密码
-              </Label>
-              <div className="relative">
-                <div className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${
-                  focusedField === "password" ? "text-primary" : "text-muted-foreground"
-                }`}>
-                  <Lock className="w-4 h-4" />
-                </div>
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="输入密码"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onFocus={() => setFocusedField("password")}
-                  onBlur={() => setFocusedField(null)}
-                  required
-                  className={`h-11 pl-10 pr-10 transition-all duration-200 ${
-                    focusedField === "password" ? "border-primary ring-2 ring-primary/15" : ""
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full h-11 font-medium rounded-lg shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 transition-all duration-200"
-            >
-              {isLoading ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  登录中...
-                </div>
-              ) : (
-                <span className="flex items-center gap-2">
-                  登录 <ArrowRight className="w-4 h-4" />
-                </span>
-              )}
-            </Button>
-          </form>
-        </div>
-
-        <p className="text-center text-xs text-muted-foreground/60 mt-6">
-          Sesame v1.1.0
-        </p>
-      </motion.div>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }

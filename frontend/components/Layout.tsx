@@ -3,12 +3,15 @@
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Key, Users,
-  Activity, LogOut, FileText, BarChart3, Server, BookOpen
+  Activity, LogOut, FileText, BarChart3, Server, BookOpen,
+  Menu, X
 } from "lucide-react";
 import { Button } from "./ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const NAV_ITEMS = [
   { name: "仪表盘", href: "/main/dashboard", icon: LayoutDashboard },
@@ -36,32 +39,6 @@ const PAGE_TITLES: Record<string, string> = {
   usage: "用量统计",
   monitor: "实时监控",
 };
-
-function NavItem({ item, active }: { item: typeof NAV_ITEMS[0]; active: boolean }) {
-  return (
-    <li>
-      <Link
-        href={item.href}
-        prefetch={true}
-        className={cn(
-          "group flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 relative",
-          active
-            ? "text-primary font-medium bg-primary/5"
-            : "text-muted-foreground hover:text-foreground hover:bg-accent"
-        )}
-      >
-        {active && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
-        )}
-        <item.icon className={cn(
-          "w-4 h-4 shrink-0 transition-colors",
-          active ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-        )} />
-        <span>{item.name}</span>
-      </Link>
-    </li>
-  );
-}
 
 function SidebarSkeleton() {
   return (
@@ -95,6 +72,10 @@ function SidebarSkeleton() {
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, isLoading } = useAuth();
   const pathname = usePathname();
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
   if (isLoading) {
     return <SidebarSkeleton />;
@@ -102,80 +83,157 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const pageTitle = PAGE_TITLES[pathname.split("/").pop() || ""] || "芝麻智门";
 
+  const sidebarContent = (
+    <aside className={cn(
+      "flex flex-col shrink-0 bg-card border-r border-border",
+      isMobile
+        ? "w-64 h-full"
+        : "w-64"
+    )}>
+      {/* Logo */}
+      <div className="h-14 flex items-center gap-2.5 px-4 border-b border-border">
+        <img src="/logo.svg" alt="Sesame" className="w-7 h-7" />
+        <div className="leading-none">
+          <div className="font-bold text-sm text-foreground tracking-tight">Sesame</div>
+          <div className="text-[10px] text-muted-foreground mt-0.5">芝麻智门</div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-3 px-2.5 scrollbar-gutter-stable">
+        <ul className="space-y-0.5">
+          {NAV_ITEMS.map((item) => (
+            <li key={item.href} onClick={isMobile ? closeSidebar : undefined}>
+              <Link
+                href={item.href}
+                prefetch={true}
+                className={cn(
+                  "group flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 relative",
+                  pathname.startsWith(item.href)
+                    ? "text-primary font-medium bg-primary/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                )}
+              >
+                {pathname.startsWith(item.href) && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
+                )}
+                <item.icon className={cn(
+                  "w-4 h-4 shrink-0 transition-colors",
+                  pathname.startsWith(item.href) ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                )} />
+                <span>{item.name}</span>
+              </Link>
+            </li>
+          ))}
+
+          {user?.role === "admin" && (
+            <>
+              <li className="my-3 mx-1">
+                <div className="h-px bg-border" />
+              </li>
+              <li className="mb-1.5 px-3">
+                <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+                  管理后台
+                </span>
+              </li>
+              {ADMIN_ITEMS.map((item) => (
+                <li key={item.href} onClick={isMobile ? closeSidebar : undefined}>
+                  <Link
+                    href={item.href}
+                    prefetch={true}
+                    className={cn(
+                      "group flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 relative",
+                      pathname.startsWith(item.href)
+                        ? "text-primary font-medium bg-primary/5"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    )}
+                  >
+                    {pathname.startsWith(item.href) && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
+                    )}
+                    <item.icon className={cn(
+                      "w-4 h-4 shrink-0 transition-colors",
+                      pathname.startsWith(item.href) ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                    )} />
+                    <span>{item.name}</span>
+                  </Link>
+                </li>
+              ))}
+            </>
+          )}
+        </ul>
+      </nav>
+
+      {/* User */}
+      <div className="p-3 border-t border-border">
+        <div className="flex items-center gap-2.5 px-2 py-2">
+          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
+            {user?.user_id?.[0]?.toUpperCase() || "U"}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-foreground truncate leading-tight">
+              {user?.user_id}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              {user?.role === "admin" ? "管理员" : "用户"}
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
+            onClick={logout}
+            title="退出登录"
+          >
+            <LogOut className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+    </aside>
+  );
+
   return (
     <div className="min-h-screen flex bg-background">
-      {/* Sidebar — 256px */}
-      <aside className="w-64 bg-card border-r border-border flex flex-col shrink-0">
-        {/* Logo */}
-        <div className="h-14 flex items-center gap-2.5 px-4 border-b border-border">
-          <img src="/logo.svg" alt="Sesame" className="w-7 h-7" />
-          <div className="leading-none">
-            <div className="font-bold text-sm text-foreground tracking-tight">Sesame</div>
-            <div className="text-[10px] text-muted-foreground mt-0.5">芝麻智门</div>
-          </div>
+      {/* Mobile overlay */}
+      {isMobile && sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity"
+          onClick={closeSidebar}
+        />
+      )}
+
+      {/* Sidebar — fixed on mobile, static on desktop */}
+      {isMobile ? (
+        <div className={cn(
+          "fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-out",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
+          {sidebarContent}
         </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2.5 scrollbar-gutter-stable">
-          <ul className="space-y-0.5">
-            {NAV_ITEMS.map((item) => (
-              <NavItem key={item.href} item={item} active={pathname.startsWith(item.href)} />
-            ))}
-
-            {user?.role === "admin" && (
-              <>
-                <li className="my-3 mx-1">
-                  <div className="h-px bg-border" />
-                </li>
-                <li className="mb-1.5 px-3">
-                  <span className="text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
-                    管理后台
-                  </span>
-                </li>
-                {ADMIN_ITEMS.map((item) => (
-                  <NavItem key={item.href} item={item} active={pathname.startsWith(item.href)} />
-                ))}
-              </>
-            )}
-          </ul>
-        </nav>
-
-        {/* User */}
-        <div className="p-3 border-t border-border">
-          <div className="flex items-center gap-2.5 px-2 py-2">
-            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
-              {user?.user_id?.[0]?.toUpperCase() || "U"}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-foreground truncate leading-tight">
-                {user?.user_id}
-              </div>
-              <div className="text-[11px] text-muted-foreground mt-0.5">
-                {user?.role === "admin" ? "管理员" : "用户"}
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
-              onClick={logout}
-              title="退出登录"
-            >
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </aside>
+      ) : (
+        sidebarContent
+      )}
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-        <header className="h-14 bg-card/80 backdrop-blur-sm border-b border-border flex items-center px-8 shrink-0">
+        <header className="h-14 bg-card/80 backdrop-blur-sm border-b border-border flex items-center px-4 md:px-8 shrink-0 gap-3">
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              title={sidebarOpen ? "关闭菜单" : "打开菜单"}
+            >
+              {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            </Button>
+          )}
           <h1 className="font-semibold text-foreground text-base tracking-tight">
             {pageTitle}
           </h1>
         </header>
         <div className="flex-1 overflow-y-auto">
-          <div className="p-8 max-w-[1440px]" key={pathname}>
+          <div className="p-4 md:p-8 max-w-[1440px]" key={pathname}>
             {children}
           </div>
         </div>

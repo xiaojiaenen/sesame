@@ -1,3 +1,5 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import { fadeInUp } from "@/lib/animations";
 import { motion } from "motion/react";
@@ -15,14 +17,19 @@ export function EmptyState({ icon, title, description, action, className }: Empt
   return (
     <motion.div
       {...fadeInUp}
-      className={cn("flex flex-col items-center justify-center py-16 px-6", className)}
+      className={cn("flex flex-col items-center justify-center py-20 px-6", className)}
     >
-      <div className="w-16 h-16 rounded-xl bg-muted flex items-center justify-center mb-4">
-        {icon || <Inbox className="w-7 h-7 text-muted-foreground" />}
+      <div className="relative mb-6">
+        <div className="absolute inset-0 bg-primary/5 rounded-full blur-2xl scale-150" />
+        <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-muted to-muted/30 ring-1 ring-border/60 flex items-center justify-center relative">
+          <div className="text-muted-foreground/70">
+            {icon || <Inbox className="w-8 h-8" />}
+          </div>
+        </div>
       </div>
-      <h3 className="text-base font-semibold text-foreground mb-1">{title}</h3>
+      <h3 className="text-base font-semibold text-foreground mb-1.5">{title}</h3>
       {description && (
-        <p className="text-sm text-muted-foreground text-center max-w-md mb-4">{description}</p>
+        <p className="text-sm text-muted-foreground text-center max-w-md mb-5">{description}</p>
       )}
       {action}
     </motion.div>

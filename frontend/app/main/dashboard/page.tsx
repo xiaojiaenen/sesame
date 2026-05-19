@@ -4,13 +4,14 @@ import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { apiFetch } from "@/lib/api";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { StatCard } from "@/components/stat-card";
 import Link from "next/link";
 import {
-  Key, Users, ArrowRight, ArrowUpRight, ArrowDownRight,
+  Key, Users, ArrowRight,
   AlertTriangle, Zap, Activity, Target,
-  Server, Database, BookOpen, BarChart3, FileText, TrendingUp, Clock
+  Server, Database, BookOpen, BarChart3, FileText, TrendingUp,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -23,43 +24,39 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
-function StatCard({ icon: Icon, label, value, loading, color = "primary", href, sub }: {
+function HeroStat({ icon: Icon, label, value, loading, color = "primary", sub }: {
   icon: React.ElementType; label: string; value: React.ReactNode; loading?: boolean;
-  color?: string; href?: string; sub?: React.ReactNode;
+  color?: string; sub?: React.ReactNode;
 }) {
-  const colorMap: Record<string, { bg: string; text: string; border: string }> = {
-    primary: { bg: "bg-primary/10", text: "text-primary", border: "border-primary/20" },
-    success: { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/20" },
-    destructive: { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400", border: "border-red-500/20" },
-    warning: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", border: "border-amber-500/20" },
-    "muted-foreground": { bg: "bg-muted", text: "text-muted-foreground", border: "border-border" },
+  const colorMap: Record<string, { bg: string; text: string; glow: string }> = {
+    primary: { bg: "bg-primary/10", text: "text-primary", glow: "bg-primary/5" },
+    success: { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", glow: "bg-emerald-500/5" },
+    destructive: { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400", glow: "bg-red-500/5" },
+    warning: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", glow: "bg-amber-500/5" },
   };
   const c = colorMap[color] || colorMap.primary;
 
-  const content = (
-    <Card className={`hover:shadow-lg transition-all duration-300 h-full group cursor-pointer border-border/40 hover:${c.border} relative overflow-hidden`}>
-      <div className={`absolute top-0 right-0 w-24 h-24 ${c.bg} rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/2`} />
-      <CardContent className="p-5 relative">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">{label}</p>
-            {loading ? (
-              <div className="h-9 w-20 skeleton-shimmer rounded-lg" />
-            ) : (
-              <p className="text-[28px] font-bold text-foreground tracking-tight leading-none">{value}</p>
-            )}
-            {sub && <div className="text-xs text-muted-foreground pt-0.5">{sub}</div>}
+  return (
+    <Card className="group relative overflow-hidden border-border/40 hover:shadow-lg transition-all duration-300">
+      <div className={`absolute inset-0 ${c.glow} opacity-0 group-hover:opacity-100 transition-opacity duration-500`} />
+      <CardContent className="p-6 relative">
+        <div className="flex items-start gap-4 mb-3">
+          <div className={`w-12 h-12 rounded-2xl ${c.bg} flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
+            <Icon className={`w-6 h-6 ${c.text}`} />
           </div>
-          <div className={`w-11 h-11 rounded-2xl ${c.bg} flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
-            <Icon className={`w-5 h-5 ${c.text}`} />
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
+            {loading ? (
+              <div className="h-10 w-24 skeleton-shimmer rounded-lg mt-1" />
+            ) : (
+              <p className="text-[32px] font-bold text-foreground tracking-tight leading-none mt-1">{value}</p>
+            )}
+            {sub && <div className="text-xs text-muted-foreground mt-1">{sub}</div>}
           </div>
         </div>
       </CardContent>
     </Card>
   );
-
-  if (href) return <Link href={href} className="block">{content}</Link>;
-  return content;
 }
 
 interface SummaryData {
@@ -113,8 +110,8 @@ export default function DashboardPage() {
             health: healthRes.status === "fulfilled" ? healthRes.value : null
           });
         }
-      } catch (error) {
-        // Ignoring expected errors
+      } catch {
+        // Expected on initial load
       } finally {
         setLoading(false);
       }
@@ -186,50 +183,74 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* User Usage Summary Cards */}
+      {/* ═══ 今日用量 - Hero Stats ═══ */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
           <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
             <Zap className="w-3.5 h-3.5 text-primary" />
           </div>
-          我的用量
+          今日用量
         </h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <HeroStat
             icon={Activity}
-            label="今日请求"
+            label="请求数"
             value={summary?.today.requests ?? 0}
             loading={loading}
             color="primary"
             sub={summary?.today.errors ? <span className="text-red-500">{summary.today.errors} 错误</span> : undefined}
           />
-          <StatCard
+          <HeroStat
             icon={Zap}
-            label="今日 Token"
+            label="Token 消耗"
             value={formatTokens(summary?.today.tokens ?? 0)}
             loading={loading}
             color="success"
-            sub={summary?.today.tokens ? <span>{formatTokens(summary.today.prompt)} 入 / {formatTokens(summary.today.completion)} 出</span> : undefined}
+            sub={summary?.today.tokens ? <span>{formatTokens(summary.today.prompt)} 入 · {formatTokens(summary.today.completion)} 出</span> : undefined}
           />
-          <StatCard
-            icon={TrendingUp}
-            label="7 日 Token"
-            value={formatTokens(summary?.last_7_days.tokens ?? 0)}
-            loading={loading}
-            color="warning"
-            sub={summary?.last_7_days.requests ? <span>{summary.last_7_days.requests} 次请求</span> : undefined}
-          />
-          <StatCard
+          <HeroStat
             icon={Target}
-            label="今日成功率"
+            label="成功率"
             value={todaySuccessRate !== null ? `${todaySuccessRate.toFixed(1)}%` : "-"}
             loading={loading}
             color={todaySuccessRate !== null && todaySuccessRate >= 99 ? "success" : todaySuccessRate !== null && todaySuccessRate >= 95 ? "warning" : "destructive"}
+            sub={summary?.today.requests ? `${summary.today.requests} 次请求` : undefined}
           />
         </div>
       </div>
 
-      {/* Token Usage Chart */}
+      {/* ═══ 7 日汇总 - Compact Stats ═══ */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          icon={Activity}
+          label="7 日请求"
+          value={summary?.last_7_days.requests ?? 0}
+          loading={loading}
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="7 日 Token"
+          value={formatTokens(summary?.last_7_days.tokens ?? 0)}
+          loading={loading}
+          color="success"
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="30 日 Token"
+          value={formatTokens(summary?.last_30_days.tokens ?? 0)}
+          loading={loading}
+          color="warning"
+        />
+        <StatCard
+          icon={Server}
+          label="渠道数"
+          value={(user?.role === "admin" ? (adminStats?.channelCount ?? channelCount) : channelCount) ?? 0}
+          loading={loading || (user?.role === "admin" && !adminStats)}
+          href="/main/channels"
+        />
+      </div>
+
+      {/* ═══ Token Usage Chart ═══ */}
       {chartData.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -239,16 +260,16 @@ export default function DashboardPage() {
             近期用量趋势
           </h3>
           <Card className="border-border/40 overflow-hidden">
-            <CardContent className="p-5 pt-4">
-              <ResponsiveContainer width="100%" height={240}>
+            <CardContent className="p-6">
+              <ResponsiveContainer width="100%" height={260}>
                 <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="colorTokens" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.25} />
-                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
+                    <linearGradient id="colorTokens2" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.2} />
+                      <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} />
+                  <CartesianGrid strokeDasharray="4 4" stroke="var(--border)" vertical={false} opacity={0.5} />
                   <XAxis
                     dataKey="date"
                     tick={{ fontSize: 11, fill: 'var(--muted-foreground)' }}
@@ -267,10 +288,10 @@ export default function DashboardPage() {
                     type="monotone"
                     dataKey="tokens"
                     name="Token"
-                    stroke="#3b82f6"
+                    stroke="var(--primary)"
                     strokeWidth={2.5}
-                    fill="url(#colorTokens)"
-                    activeDot={{ r: 5, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }}
+                    fill="url(#colorTokens2)"
+                    activeDot={{ r: 5, fill: 'var(--primary)', stroke: 'var(--background)', strokeWidth: 3 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -279,7 +300,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Account + Infrastructure Row */}
+      {/* ═══ Account + Quick Access ═══ */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* User Card */}
         <Card className="md:col-span-2 border-border/40 overflow-hidden relative group">
@@ -301,23 +322,38 @@ export default function DashboardPage() {
         </Card>
 
         <StatCard
-          icon={Server}
-          label="渠道数"
-          value={(user?.role === "admin" ? (adminStats?.channelCount ?? channelCount) : channelCount) ?? 0}
-          loading={loading || (user?.role === "admin" && !adminStats)}
-          href="/main/channels"
-        />
-
-        <StatCard
           icon={Key}
           label="API Keys"
           value={apiKeyCount ?? 0}
           loading={loading}
           href="/main/api-keys"
         />
+
+        {/* Quick Actions */}
+        <Card className="border-border/40">
+          <CardContent className="p-4">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mb-3">快速操作</p>
+            <div className="space-y-1.5">
+              <Link href="/main/guide" className="flex items-center justify-between px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                <span className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  使用说明
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 opacity-40" />
+              </Link>
+              <Link href="/main/api-keys" className="flex items-center justify-between px-3 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+                <span className="flex items-center gap-2">
+                  <Key className="w-4 h-4" />
+                  创建 Key
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 opacity-40" />
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Admin Stats */}
+      {/* ═══ Admin Stats ═══ */}
       {user?.role === "admin" && (
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
@@ -332,40 +368,8 @@ export default function DashboardPage() {
             <StatCard icon={Database} label="数据库" value={adminStats?.health?.database === "ok" ? "正常" : "异常"} loading={!adminStats} color={adminStats?.health?.database === "ok" ? "success" : "destructive"} />
             <StatCard icon={Server} label="服务状态" value={adminStats?.health?.status === "healthy" ? "健康" : "异常"} loading={!adminStats} color={adminStats?.health?.status === "healthy" ? "success" : "destructive"} />
           </div>
-        </div>
-      )}
 
-      {/* Quick Actions */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-foreground">快速操作</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { icon: Server, label: "渠道管理", desc: "查看和配置后端渠道", href: "/main/channels" },
-            { icon: Key, label: "API Key", desc: "创建和管理访问密钥", href: "/main/api-keys" },
-            { icon: BookOpen, label: "使用说明", desc: "查看配置指南", href: "/main/guide" },
-          ].map((item) => (
-            <Link key={item.href} href={item.href}>
-              <Card className="hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 cursor-pointer group h-full border-border/40 hover:border-primary/20">
-                <CardContent className="p-4 flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center shrink-0 group-hover:bg-primary/10 group-hover:scale-105 transition-all duration-300">
-                    <item.icon className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-foreground">{item.label}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{item.desc}</div>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-muted-foreground/30 group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* Admin Quick Links */}
-      {user?.role === "admin" && (
-        <div className="space-y-4">
-          <h3 className="text-sm font-semibold text-foreground">管理后台</h3>
+          {/* Admin Quick Links */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
               { icon: Users, label: "用户管理", href: "/main/admin/users" },

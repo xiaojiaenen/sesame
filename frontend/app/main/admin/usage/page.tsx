@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatCard } from "@/components/stat-card";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
@@ -157,38 +158,6 @@ export default function UsagePage() {
     );
   };
 
-  const SummaryCard = ({ icon: Icon, label, value, loading: l, color = "primary", sub }: {
-    icon: React.ElementType; label: string; value: string; loading: boolean; color?: string; sub?: React.ReactNode;
-  }) => {
-    const colorMap: Record<string, { bg: string; text: string; border: string }> = {
-      primary: { bg: "bg-primary/10", text: "text-primary", border: "border-primary/20" },
-      success: { bg: "bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400", border: "border-emerald-500/20" },
-      destructive: { bg: "bg-red-500/10", text: "text-red-600 dark:text-red-400", border: "border-red-500/20" },
-      warning: { bg: "bg-amber-500/10", text: "text-amber-600 dark:text-amber-400", border: "border-amber-500/20" },
-    };
-    const c = colorMap[color] || colorMap.primary;
-    return (
-      <Card className={`hover:shadow-lg transition-all duration-300 group cursor-pointer border-border/40 hover:${c.border} relative overflow-hidden`}>
-        <div className={`absolute top-0 right-0 w-24 h-24 ${c.bg} rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/2`} />
-        <CardContent className="p-5 relative">
-          <div className="flex items-start justify-between">
-            <div className="space-y-1.5">
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">{label}</p>
-              {l ? (
-                <div className="h-9 w-20 skeleton-shimmer rounded-lg" />
-              ) : (
-                <p className="text-[28px] font-bold text-foreground tracking-tight leading-none">{value}</p>
-              )}
-              {sub && <div className="text-xs text-muted-foreground pt-0.5">{sub}</div>}
-            </div>
-            <div className={`w-11 h-11 rounded-2xl ${c.bg} flex items-center justify-center shrink-0 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
-              <Icon className={`w-5 h-5 ${c.text}`} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
 
   return (
     <div className="space-y-8">
@@ -226,7 +195,7 @@ export default function UsagePage() {
         </h3>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <motion.div {...fadeInUp}>
-            <SummaryCard
+            <StatCard
               icon={TrendingUp}
               label="总请求数"
               value={totalRequests.toLocaleString()}
@@ -242,13 +211,13 @@ export default function UsagePage() {
             />
           </motion.div>
           <motion.div {...fadeInUp}>
-            <SummaryCard icon={BarChart3} label="总 Token" value={formatTokens(totalTokens)} loading={loading} />
+            <StatCard icon={BarChart3} label="总 Token" value={formatTokens(totalTokens)} loading={loading} />
           </motion.div>
           <motion.div {...fadeInUp}>
-            <SummaryCard icon={Target} label="成功率" value={`${successRate.toFixed(1)}%`} loading={loading} color={successRate >= 99 ? "success" : successRate >= 95 ? "warning" : "destructive"} />
+            <StatCard icon={Target} label="成功率" value={`${successRate.toFixed(1)}%`} loading={loading} color={successRate >= 99 ? "success" : successRate >= 95 ? "warning" : "destructive"} />
           </motion.div>
           <motion.div {...fadeInUp}>
-            <SummaryCard icon={Gauge} label="平均请求 Token" value={formatTokens(avgTokensPerReq)} loading={loading} color="warning" />
+            <StatCard icon={Gauge} label="平均请求 Token" value={formatTokens(avgTokensPerReq)} loading={loading} color="warning" />
           </motion.div>
         </div>
       </div>
