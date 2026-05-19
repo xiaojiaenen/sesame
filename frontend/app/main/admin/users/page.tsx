@@ -15,7 +15,7 @@ import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { Users, ChevronLeft, ChevronRight, Shield, User, UserMinus, Plus } from "lucide-react";
+import { Users, ChevronLeft, ChevronRight, Shield, User, UserMinus, Plus, Eye, EyeOff } from "lucide-react";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -28,6 +28,7 @@ export default function AdminUsersPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState("user");
 
   const fetchUsers = async () => {
@@ -248,7 +249,22 @@ export default function AdminUsersPage() {
             </div>
             <div className="space-y-2">
               <Label>密码</Label>
-              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="输入密码" />
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="输入密码"
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>角色</Label>

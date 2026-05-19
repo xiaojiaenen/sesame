@@ -8,10 +8,11 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Key, Users,
   Activity, LogOut, FileText, BarChart3, Server, BookOpen,
-  Menu, X
+  Menu, X, Sun, Moon
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTheme } from "next-themes";
 
 const NAV_ITEMS = [
   { name: "仪表盘", href: "/main/dashboard", icon: LayoutDashboard },
@@ -74,6 +75,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
@@ -228,9 +230,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               {sidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </Button>
           )}
-          <h1 className="font-semibold text-foreground text-base tracking-tight">
+          <h1 className="font-semibold text-foreground text-base tracking-tight flex-1">
             {pageTitle}
           </h1>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            title={theme === "dark" ? "切换亮色模式" : "切换暗色模式"}
+          >
+            {theme === "dark" ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </Button>
         </header>
         <div className="flex-1 overflow-y-auto">
           <div className="p-4 md:p-8 max-w-[1440px]" key={pathname}>

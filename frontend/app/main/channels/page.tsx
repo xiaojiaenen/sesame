@@ -203,7 +203,7 @@ export default function ChannelsPage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-success/10 text-success hover:bg-success/10">正常</Badge>;
+        return <Badge className="bg-success/10 text-success hover:bg-success/10"><span className="status-dot-active inline-block w-1.5 h-1.5 rounded-full bg-success mr-1.5" />正常</Badge>;
       case "error":
         return <Badge variant="destructive">异常</Badge>;
       default:

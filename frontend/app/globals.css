@@ -281,6 +281,17 @@
   --table-border: oklch(0.28 0.015 250);
 }
 
+/* ── Monitor radar animations ── */
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+
+@keyframes radar-sweep {
+  0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.5; }
+  100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .skeleton-shimmer {
@@ -293,5 +304,9 @@
   }
   .status-dot-active {
     animation: none;
+  }
+  [style*="pulse-ring"],
+  [style*="radar-sweep"] {
+    animation: none !important;
   }
 }

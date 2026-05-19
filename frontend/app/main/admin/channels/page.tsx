@@ -16,7 +16,7 @@ import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { Server, Plus, Trash2, Edit, RefreshCw, X, Key, Cookie, ChevronLeft, ChevronRight } from "lucide-react";
+import { Server, Plus, Trash2, Edit, RefreshCw, X, Key, Cookie, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Channel {
@@ -73,6 +73,7 @@ export default function ChannelsPage() {
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
   const [authType, setAuthType] = useState<"api_key" | "cookie">("api_key");
   const [modelMappings, setModelMappings] = useState<ModelMapping[]>([]);
   const [newAccept, setNewAccept] = useState("");
@@ -348,7 +349,7 @@ export default function ChannelsPage() {
                         }`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${
                             ch.status === "active" ? "bg-emerald-500" : ch.status === "error" ? "bg-red-500" : "bg-muted-foreground"
-                          } ${ch.status === "error" ? "animate-pulse" : ""}`} />
+                          } ${ch.status === "active" ? "status-dot-active" : ch.status === "error" ? "animate-pulse" : ""}`} />
                           {ch.status === "active" ? "正常" : ch.status === "error" ? "异常" : "禁用"}
                         </span>
                       </TableCell>
@@ -439,7 +440,22 @@ export default function ChannelsPage() {
             {authType === "api_key" && (
               <div className="space-y-2">
                 <Label>API Key</Label>
-                <Input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-..." />
+                <div className="relative">
+                  <Input
+                    type={showApiKey ? "text" : "password"}
+                    value={apiKey}
+                    onChange={e => setApiKey(e.target.value)}
+                    placeholder="sk-..."
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
             )}
 
