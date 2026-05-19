@@ -188,6 +188,21 @@ async def _proxy_request(request: Request, auth: AuthUser):
             status_code=502,
             content={"error": {"message": str(e), "type": "sesame_error"}},
         )
+    except Exception as e:
+        logger.exception(f"[CHAT] Unexpected error: {e}")
+        duration_ms = int((time.monotonic() - start) * 1000)
+        await _log_request(auth.user_id, auth.key_id, external_model, stream, 500, duration_ms, error_message=str(e))
+        await broadcast_request_event(
+            event_type="request_error",
+            user_id=auth.user_id,
+            model=external_model,
+            status_code=500,
+            error_message=str(e),
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"error": {"message": "内部服务器错误", "type": "sesame_error"}},
+        )
     finally:
         if auth.key_id:
             await release_concurrency(auth.key_id)

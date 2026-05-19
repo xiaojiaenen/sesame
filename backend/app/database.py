@@ -32,7 +32,7 @@ engine = create_async_engine(
     echo=False,
     pool_size=20,
     max_overflow=40,
-    pool_recycle=3600,
+    pool_recycle=600,
     pool_pre_ping=True,
     pool_timeout=10,
 )

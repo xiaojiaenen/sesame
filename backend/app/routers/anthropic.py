@@ -438,6 +438,21 @@ async def anthropic_messages(
                 }
             },
         )
+    except Exception as e:
+        logger.exception(f"[ANTHROPIC] Unexpected error: {e}")
+        duration_ms = int((time.monotonic() - start) * 1000)
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 500, error_message=str(e))
+        await broadcast_request_event(
+            event_type="request_error", user_id=auth.user_id, model=external_model,
+            status_code=500, error_message=str(e),
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "type": "error",
+                "error": {"type": "api_error", "message": "内部服务器错误"}
+            },
+        )
     finally:
         if auth.key_id:
             await release_concurrency(auth.key_id)
@@ -462,8 +477,8 @@ async def _log_request(user_id: str, key_id: int | None, model: str, duration_ms
                 api_format="anthropic",
                 error_message=error_message,
             )
-    except Exception:
-        pass
+    except Exception as e:
+        logging.getLogger("sesame").error(f"[ANTHROPIC] Failed to log request: {e}")
 
 
 async def _update_key_last_used(key_id: int):
