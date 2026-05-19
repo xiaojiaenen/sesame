@@ -7,9 +7,15 @@ from fastapi.responses import JSONResponse
 
 logger = logging.getLogger("sesame.chat")
 
+from app.config import settings
 from app.auth import AuthUser, get_api_key_user
 from app.database import async_session
 from app.services import apikey_service, channel_service, proxy_service, rate_limit_service, log_service
+from app.services.cache_service import (
+    acquire_concurrency, release_concurrency,
+    acquire_dedup, wait_dedup_result, store_dedup_result,
+    get_cached, set_cached, compute_fingerprint,
+)
 from app.services.websocket_service import broadcast_request_event
 
 router = APIRouter()
@@ -74,6 +80,57 @@ async def _proxy_request(request: Request, auth: AuthUser):
             content={"error": {"message": "没有可用的 API 渠道，请先在管理后台创建渠道", "type": "sesame_error"}},
         )
 
+    # ── 三层防护：并发控制 → 去重 → 缓存 ──
+    fingerprint = compute_fingerprint(body, auth.user_id)
+
+    # 1. 并发控制
+    if auth.key_id:
+        if not await acquire_concurrency(auth.key_id, settings.max_concurrent_per_key):
+            return JSONResponse(
+                status_code=429,
+                content={"error": {"message": "并发请求过多，请稍后重试", "type": "concurrency_error"}},
+            )
+
+    # 2. 请求去重 + 3. 精确缓存（仅非流式）
+    if not stream:
+        if not await acquire_dedup(fingerprint, settings.dedup_ttl_seconds):
+            dedup_result = await wait_dedup_result(fingerprint, timeout=3.0)
+            if dedup_result:
+                logger.info(f"[CHAT] DEDUP_HIT model={external_model} user={auth.user_id}")
+                duration_ms = int((time.monotonic() - start) * 1000)
+                tokens_prompt = dedup_result.get("usage", {}).get("prompt_tokens", 0)
+                tokens_completion = dedup_result.get("usage", {}).get("completion_tokens", 0)
+                await _log_request(auth.user_id, auth.key_id, external_model, False, 200, duration_ms, tokens_prompt, tokens_completion)
+                await broadcast_request_event(
+                    event_type="request_end", user_id=auth.user_id, model=external_model,
+                    latency_ms=duration_ms, status_code=200, is_stream=False,
+                )
+                if auth.key_id:
+                    await release_concurrency(auth.key_id)
+                return JSONResponse(content=dedup_result)
+            if auth.key_id:
+                await release_concurrency(auth.key_id)
+            return JSONResponse(
+                status_code=429,
+                content={"error": {"message": "重复请求，请稍后重试", "type": "dedup_error"}},
+            )
+
+        cached = await get_cached(fingerprint)
+        if cached:
+            logger.info(f"[CHAT] CACHE_HIT model={external_model} user={auth.user_id}")
+            duration_ms = int((time.monotonic() - start) * 1000)
+            tokens_prompt = cached.get("usage", {}).get("prompt_tokens", 0)
+            tokens_completion = cached.get("usage", {}).get("completion_tokens", 0)
+            await _log_request(auth.user_id, auth.key_id, external_model, False, 200, duration_ms, tokens_prompt, tokens_completion)
+            await broadcast_request_event(
+                event_type="request_end", user_id=auth.user_id, model=external_model,
+                latency_ms=duration_ms, status_code=200, is_stream=False,
+            )
+            await store_dedup_result(fingerprint, cached)
+            if auth.key_id:
+                await release_concurrency(auth.key_id)
+            return JSONResponse(content=cached)
+
     # 广播请求开始事件
     await broadcast_request_event(
         event_type="request_start",
@@ -131,6 +188,9 @@ async def _proxy_request(request: Request, auth: AuthUser):
             status_code=502,
             content={"error": {"message": str(e), "type": "sesame_error"}},
         )
+    finally:
+        if auth.key_id:
+            await release_concurrency(auth.key_id)
 
     # 提取 token 用量并记录日志
     if isinstance(result, dict):
@@ -143,6 +203,10 @@ async def _proxy_request(request: Request, auth: AuthUser):
             latency_ms=duration_ms, status_code=200, is_stream=False,
         )
         await _log_request(auth.user_id, auth.key_id, external_model, False, 200, duration_ms, tokens_prompt, tokens_completion)
+
+        # 写入缓存 + 更新去重结果
+        await set_cached(fingerprint, result, settings.cache_ttl_seconds)
+        await store_dedup_result(fingerprint, result)
     else:
         # 替换 body_iterator 而非创建新 StreamingResponse，避免并发下 generator 被重复消费
         _stream_start = start

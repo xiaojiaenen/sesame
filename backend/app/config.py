@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     sso_password_field: str = "password"
     sso_extra_fields: str = ""
 
+    # Cache & Dedup
+    cache_ttl_seconds: int = 300
+    dedup_ttl_seconds: int = 5
+    max_concurrent_per_key: int = 10
+
     version: str = "1.1.0"
 
     @property

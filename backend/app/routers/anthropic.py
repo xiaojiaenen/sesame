@@ -9,9 +9,15 @@ logger = logging.getLogger("sesame.anthropic")
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from app.config import settings
 from app.auth import AuthUser
 from app.database import async_session
 from app.services import channel_service, proxy_service, rate_limit_service, log_service
+from app.services.cache_service import (
+    acquire_concurrency, release_concurrency,
+    acquire_dedup, wait_dedup_result, store_dedup_result,
+    get_cached, set_cached, compute_fingerprint,
+)
 from app.services.websocket_service import broadcast_request_event
 from app.services.anthropic_format import (
     convert_anthropic_request_to_openai,
@@ -129,6 +135,65 @@ async def anthropic_messages(
     pref_channel_id, load_balance = get_user_prefs(auth.user_id)
     preferred_channel_id = pref_channel_id if not load_balance else None
 
+    # ── 三层防护：并发控制 → 去重 → 缓存 ──
+    fingerprint = compute_fingerprint(openai_req, auth.user_id)
+
+    # 1. 并发控制
+    if auth.key_id:
+        if not await acquire_concurrency(auth.key_id, settings.max_concurrent_per_key):
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "type": "error",
+                    "error": {"type": "rate_limit_error", "message": "并发请求过多，请稍后重试"}
+                },
+            )
+
+    # 2. 请求去重 + 3. 精确缓存（仅非流式）
+    if not stream:
+        if not await acquire_dedup(fingerprint, settings.dedup_ttl_seconds):
+            dedup_result = await wait_dedup_result(fingerprint, timeout=3.0)
+            if dedup_result:
+                logger.info(f"[ANTHROPIC] DEDUP_HIT model={external_model} user={auth.user_id}")
+                anthropic_resp = convert_openai_response_to_anthropic(dedup_result, external_model)
+                duration_ms = int((time.monotonic() - start) * 1000)
+                tokens_prompt = dedup_result.get("usage", {}).get("prompt_tokens", 0)
+                tokens_completion = dedup_result.get("usage", {}).get("completion_tokens", 0)
+                await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 200, tokens_prompt, tokens_completion)
+                await broadcast_request_event(
+                    event_type="request_end", user_id=auth.user_id, model=external_model,
+                    latency_ms=duration_ms, status_code=200, is_stream=False,
+                )
+                if auth.key_id:
+                    await release_concurrency(auth.key_id)
+                return JSONResponse(content=anthropic_resp, headers={"anthropic-version": "2023-06-01", "anthropic-beta": "extended-thinking-2025-01-24"})
+            if auth.key_id:
+                await release_concurrency(auth.key_id)
+            return JSONResponse(
+                status_code=429,
+                content={
+                    "type": "error",
+                    "error": {"type": "rate_limit_error", "message": "重复请求，请稍后重试"}
+                },
+            )
+
+        cached = await get_cached(fingerprint)
+        if cached:
+            logger.info(f"[ANTHROPIC] CACHE_HIT model={external_model} user={auth.user_id}")
+            anthropic_resp = convert_openai_response_to_anthropic(cached, external_model)
+            duration_ms = int((time.monotonic() - start) * 1000)
+            tokens_prompt = cached.get("usage", {}).get("prompt_tokens", 0)
+            tokens_completion = cached.get("usage", {}).get("completion_tokens", 0)
+            await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 200, tokens_prompt, tokens_completion)
+            await broadcast_request_event(
+                event_type="request_end", user_id=auth.user_id, model=external_model,
+                latency_ms=duration_ms, status_code=200, is_stream=False,
+            )
+            await store_dedup_result(fingerprint, cached)
+            if auth.key_id:
+                await release_concurrency(auth.key_id)
+            return JSONResponse(content=anthropic_resp, headers={"anthropic-version": "2023-06-01", "anthropic-beta": "extended-thinking-2025-01-24"})
+
     # 广播请求开始事件
     await broadcast_request_event(
         event_type="request_start",
@@ -171,6 +236,11 @@ async def anthropic_messages(
                     event_type="request_end", user_id=auth.user_id, model=external_model,
                     latency_ms=duration_ms, status_code=200, is_stream=False,
                 )
+
+                # 写入缓存 + 更新去重（stream 请求但后端返回非流式 dict）
+                await set_cached(fingerprint, result, settings.cache_ttl_seconds)
+                await store_dedup_result(fingerprint, result)
+
                 return JSONResponse(content=anthropic_resp, headers={"anthropic-version": "2023-06-01", "anthropic-beta": "extended-thinking-2025-01-24"})
 
             # 包装流式响应以转换格式
@@ -321,6 +391,11 @@ async def anthropic_messages(
                     event_type="request_end", user_id=auth.user_id, model=external_model,
                     latency_ms=duration_ms, status_code=200, is_stream=False,
                 )
+
+                # 写入缓存 + 更新去重结果
+                await set_cached(fingerprint, result, settings.cache_ttl_seconds)
+                await store_dedup_result(fingerprint, result)
+
                 import asyncio
                 if auth.key_id:
                     asyncio.create_task(_update_key_last_used(auth.key_id))
@@ -363,6 +438,9 @@ async def anthropic_messages(
                 }
             },
         )
+    finally:
+        if auth.key_id:
+            await release_concurrency(auth.key_id)
 
 
 async def _log_request(user_id: str, key_id: int | None, model: str, duration_ms: int, status_code: int, tokens_prompt: int = 0, tokens_completion: int = 0, is_stream: bool = False, error_message: str | None = None):
