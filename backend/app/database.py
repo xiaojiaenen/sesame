@@ -10,7 +10,7 @@ class SafeAsyncSession(AsyncSession):
     """AsyncSession whose close() is shielded from cancellation.
 
     When a request task is cancelled mid-flight, the pool connection must still
-    be returned.  Without shielding, the greenlet-based asyncmy bridge can raise
+    be returned.  Without shielding, the greenlet-based driver bridge can raise
     CancelledError inside do_terminate even though the pool already uses
     asyncio.shield() -- leaving the connection checked out forever.
     """
@@ -37,9 +37,7 @@ engine = create_async_engine(
     pool_timeout=10,
     connect_args={
         "connect_timeout": 10,
-        "read_timeout": 30,
-        "write_timeout": 30,
-        "init_command": "SET SESSION wait_timeout = 7200, SESSION interactive_timeout = 7200",
+        "autocommit": False,
     },
 )
 

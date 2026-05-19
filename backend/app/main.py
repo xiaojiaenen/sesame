@@ -18,7 +18,7 @@ logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
 logging.getLogger("asyncio").setLevel(logging.WARNING)
 
 # 抑制 sqlalchemy pool 连接终止错误的噪音日志
-# asyncmy 取消时 do_terminate 中的 asyncio.shield 会被 greenlet 桥接绕过，
+# 异步驱动取消时 do_terminate 中的 asyncio.shield 会被 greenlet 桥接绕过，
 # 导致 CancelledError（连接由 pool 自动恢复）。同时抑制 GC 发现未归还连接时的
 # ERROR 日志——这些连接会在 engine.dispose() 时统一清理。
 class _PoolNoiseFilter(logging.Filter):

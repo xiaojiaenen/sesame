@@ -48,7 +48,7 @@ class Settings(BaseSettings):
         if self.database_url:
             return self.database_url
         pwd = f":{self.mysql_password}" if self.mysql_password else ""
-        return f"mysql+asyncmy://{self.mysql_user}{pwd}@{self.mysql_host}:{self.mysql_port}/{self.mysql_database}"
+        return f"mysql+aiomysql://{self.mysql_user}{pwd}@{self.mysql_host}:{self.mysql_port}/{self.mysql_database}"
 
     @property
     def redis_url(self) -> str:
