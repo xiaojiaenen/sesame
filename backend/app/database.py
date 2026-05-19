@@ -1,9 +1,13 @@
 import asyncio
+import logging
 from collections.abc import AsyncGenerator
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
+
+logger = logging.getLogger("sesame.db")
 
 
 class SafeAsyncSession(AsyncSession):
@@ -32,10 +36,24 @@ engine = create_async_engine(
     echo=False,
     pool_size=20,
     max_overflow=40,
-    pool_recycle=600,
+    pool_recycle=300,
     pool_pre_ping=True,
     pool_timeout=10,
 )
+
+
+@event.listens_for(engine.sync_engine, "connect")
+def _on_connect(dbapi_connection, _connection_record):
+    """Set session-level wait_timeout to prevent MySQL from killing idle connections."""
+    try:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("SET SESSION wait_timeout = 7200")
+        cursor.execute("SET SESSION interactive_timeout = 7200")
+        cursor.close()
+    except Exception:
+        logger.warning("Failed to set session timeouts on new connection")
+
+
 async_session = async_sessionmaker(engine, class_=SafeAsyncSession, expire_on_commit=False)
 
 

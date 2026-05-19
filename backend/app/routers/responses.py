@@ -332,8 +332,9 @@ async def responses_endpoint(request: Request):
 
 async def _log_request(user_id, key_id, model, duration_ms, status_code,
                         tokens_prompt=0, tokens_completion=0, is_stream=False, error_message=None):
-    try:
-        internal_model = proxy_service._last_backend_model.get() or model
+    internal_model = proxy_service._last_backend_model.get() or model
+
+    async def _write():
         async with async_session() as db:
             await log_service.log_request(
                 db=db, user_id=user_id, key_id=key_id, model=model,
@@ -342,8 +343,15 @@ async def _log_request(user_id, key_id, model, duration_ms, status_code,
                 status_code=status_code, is_stream=is_stream, api_format="responses",
                 error_message=error_message,
             )
+
+    try:
+        await _write()
     except Exception as e:
-        logging.getLogger("sesame").error(f"[RESPONSES] Failed to log request: {e}")
+        logger.warning(f"First log attempt failed: {e}, retrying...")
+        try:
+            await _write()
+        except Exception as e2:
+            logging.getLogger("sesame").error(f"[RESPONSES] Failed to log request after retry: {e2}")
 
 
 async def _update_key_last_used(key_id: int):

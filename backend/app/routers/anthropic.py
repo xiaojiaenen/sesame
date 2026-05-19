@@ -460,8 +460,9 @@ async def anthropic_messages(
 
 async def _log_request(user_id: str, key_id: int | None, model: str, duration_ms: int, status_code: int, tokens_prompt: int = 0, tokens_completion: int = 0, is_stream: bool = False, error_message: str | None = None):
     """记录请求日志"""
-    try:
-        internal_model = proxy_service._last_backend_model.get() or model
+    internal_model = proxy_service._last_backend_model.get() or model
+
+    async def _write():
         async with async_session() as db:
             await log_service.log_request(
                 db=db,
@@ -477,8 +478,15 @@ async def _log_request(user_id: str, key_id: int | None, model: str, duration_ms
                 api_format="anthropic",
                 error_message=error_message,
             )
+
+    try:
+        await _write()
     except Exception as e:
-        logging.getLogger("sesame").error(f"[ANTHROPIC] Failed to log request: {e}")
+        logger.warning(f"First log attempt failed: {e}, retrying...")
+        try:
+            await _write()
+        except Exception as e2:
+            logging.getLogger("sesame").error(f"[ANTHROPIC] Failed to log request after retry: {e2}")
 
 
 async def _update_key_last_used(key_id: int):

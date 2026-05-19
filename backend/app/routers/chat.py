@@ -266,9 +266,10 @@ async def _update_key_last_used(key_id: int):
 
 
 async def _log_request(user_id, key_id, external_model, stream, status_code, duration_ms, tokens_prompt=0, tokens_completion=0, error_message=None):
-    try:
-        from app.services.proxy_service import _last_backend_model
-        internal_model = _last_backend_model.get() or external_model
+    from app.services.proxy_service import _last_backend_model
+    internal_model = _last_backend_model.get() or external_model
+
+    async def _write():
         async with async_session() as db:
             await log_service.log_request(
                 db=db,
@@ -284,6 +285,12 @@ async def _log_request(user_id, key_id, external_model, stream, status_code, dur
                 api_format="openai",
                 error_message=error_message,
             )
+
+    try:
+        await _write()
     except Exception as e:
-        import logging
-        logging.getLogger("sesame").error(f"Failed to log request: {e}")
+        logger.warning(f"First log attempt failed: {e}, retrying...")
+        try:
+            await _write()
+        except Exception as e2:
+            logger.error(f"Failed to log request after retry: {e2}")
