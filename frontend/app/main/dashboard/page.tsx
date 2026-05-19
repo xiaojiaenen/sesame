@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/api";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/stat-card";
+import { formatTokens } from "@/lib/utils";
 import Link from "next/link";
 import {
   Key, Users, ArrowRight,
@@ -16,13 +17,6 @@ import {
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2).replace(/\.?0+$/, '') + 'B';
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
-  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
-  return String(n);
-}
 
 function HeroStat({ icon: Icon, label, value, loading, color = "primary", sub }: {
   icon: React.ElementType; label: string; value: React.ReactNode; loading?: boolean;
