@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { StatCard } from "@/components/stat-card";
 import { formatTokens } from "@/lib/utils";
+import { TokenDisplay } from "@/components/token-display";
 import Link from "next/link";
 import {
   Key, Users, ArrowRight,
@@ -134,7 +135,7 @@ export default function DashboardPage() {
           <div key={i} className="flex items-center gap-2 text-xs">
             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
             <span className="text-muted-foreground">{entry.name}:</span>
-            <span className="font-semibold text-foreground tabular-nums">{formatTokens(entry.value)}</span>
+            <span className="font-semibold text-foreground tabular-nums"><TokenDisplay n={entry.value} /></span>
           </div>
         ))}
       </div>
@@ -197,10 +198,10 @@ export default function DashboardPage() {
           <HeroStat
             icon={Zap}
             label="Token 消耗"
-            value={formatTokens(summary?.today.tokens ?? 0)}
+            value={<TokenDisplay n={summary?.today.tokens ?? 0} />}
             loading={loading}
             color="success"
-            sub={summary?.today.tokens ? <span>{formatTokens(summary.today.prompt)} 入 · {formatTokens(summary.today.completion)} 出</span> : undefined}
+            sub={summary?.today.tokens ? <span><TokenDisplay n={summary.today.prompt} /> 入 · <TokenDisplay n={summary.today.completion} /> 出</span> : undefined}
           />
           <HeroStat
             icon={Target}
@@ -224,14 +225,14 @@ export default function DashboardPage() {
         <StatCard
           icon={TrendingUp}
           label="7 日 Token"
-          value={formatTokens(summary?.last_7_days.tokens ?? 0)}
+          value={<TokenDisplay n={summary?.last_7_days.tokens ?? 0} />}
           loading={loading}
           color="success"
         />
         <StatCard
           icon={TrendingUp}
           label="30 日 Token"
-          value={formatTokens(summary?.last_30_days.tokens ?? 0)}
+          value={<TokenDisplay n={summary?.last_30_days.tokens ?? 0} />}
           loading={loading}
           color="warning"
         />

@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatTokens } from "@/lib/utils";
+import { TokenDisplay } from "@/components/token-display";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
@@ -101,15 +101,15 @@ function TokenCell({ prompt, completion }: { prompt: number; completion: number 
   return (
     <div className="flex items-center gap-2 min-w-[120px]">
       <div className="flex-1 space-y-1">
-        <div className="text-xs font-semibold tabular-nums text-foreground">{formatTokens(total)}</div>
+        <div className="text-xs font-semibold tabular-nums text-foreground"><TokenDisplay n={total} /></div>
         <div className="flex h-1.5 rounded-full overflow-hidden bg-muted/60">
           <div className="bg-sky-400 dark:bg-sky-500 rounded-l-full" style={{ width: `${promptPct}%` }} />
           <div className="bg-violet-400 dark:bg-violet-500 rounded-r-full" style={{ width: `${100 - promptPct}%` }} />
         </div>
       </div>
       <div className="flex flex-col text-[10px] text-muted-foreground leading-tight tabular-nums shrink-0">
-        <span className="flex items-center gap-0.5"><ArrowDown className="w-2.5 h-2.5 text-sky-400" />{formatTokens(prompt)}</span>
-        <span className="flex items-center gap-0.5"><ArrowUp className="w-2.5 h-2.5 text-violet-400" />{formatTokens(completion)}</span>
+        <span className="flex items-center gap-0.5"><ArrowDown className="w-2.5 h-2.5 text-sky-400" /><TokenDisplay n={prompt} /></span>
+        <span className="flex items-center gap-0.5"><ArrowUp className="w-2.5 h-2.5 text-violet-400" /><TokenDisplay n={completion} /></span>
       </div>
     </div>
   );

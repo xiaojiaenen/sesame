@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
-import { formatTokens } from "@/lib/utils";
+import { TokenDisplay } from "@/components/token-display";
 import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
@@ -205,13 +205,13 @@ export default function UsagePage() {
             />
           </motion.div>
           <motion.div {...fadeInUp}>
-            <StatCard icon={BarChart3} label="总 Token" value={formatTokens(totalTokens)} loading={loading} />
+            <StatCard icon={BarChart3} label="总 Token" value={<TokenDisplay n={totalTokens} />} loading={loading} />
           </motion.div>
           <motion.div {...fadeInUp}>
             <StatCard icon={Target} label="成功率" value={`${successRate.toFixed(1)}%`} loading={loading} color={successRate >= 99 ? "success" : successRate >= 95 ? "warning" : "destructive"} />
           </motion.div>
           <motion.div {...fadeInUp}>
-            <StatCard icon={Gauge} label="平均请求 Token" value={formatTokens(avgTokensPerReq)} loading={loading} color="warning" />
+            <StatCard icon={Gauge} label="平均请求 Token" value={<TokenDisplay n={avgTokensPerReq} />} loading={loading} color="warning" />
           </motion.div>
         </div>
       </div>
@@ -363,7 +363,7 @@ export default function UsagePage() {
                           return (
                             <div className="bg-popover/95 backdrop-blur-md border border-border/60 rounded-xl p-3 shadow-2xl">
                               <p className="text-xs font-semibold">{payload[0].name}</p>
-                              <p className="text-xs text-muted-foreground">{formatTokens(payload[0].value as number)}</p>
+                              <p className="text-xs text-muted-foreground"><TokenDisplay n={payload[0].value as number} /></p>
                             </div>
                           );
                         }} />
@@ -373,11 +373,11 @@ export default function UsagePage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]" />Prompt</span>
-                      <span className="font-medium">{formatTokens(totalPrompt)}</span>
+                      <span className="font-medium"><TokenDisplay n={totalPrompt} /></span>
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-[#10b981]" />Completion</span>
-                      <span className="font-medium">{formatTokens(totalCompletion)}</span>
+                      <span className="font-medium"><TokenDisplay n={totalCompletion} /></span>
                     </div>
                   </div>
                 </div>
@@ -417,7 +417,7 @@ export default function UsagePage() {
                         return (
                           <div className="bg-popover/95 backdrop-blur-md border border-border/60 rounded-xl p-3 shadow-2xl">
                             <p className="text-xs font-semibold mb-1">{d.fullName}</p>
-                            <p className="text-xs text-muted-foreground">Token: {formatTokens(d.tokens)}</p>
+                            <p className="text-xs text-muted-foreground">Token: <TokenDisplay n={d.tokens} /></p>
                             <p className="text-xs text-muted-foreground">请求: {d.requests}</p>
                             <p className="text-xs text-muted-foreground">延迟: {d.avgLatency}ms</p>
                           </div>
@@ -463,7 +463,7 @@ export default function UsagePage() {
                       return (
                         <div className="bg-popover/95 backdrop-blur-md border border-border/60 rounded-xl p-3 shadow-2xl">
                           <p className="text-xs font-semibold mb-1">{d.name}</p>
-                          <p className="text-xs text-muted-foreground">Token: {formatTokens(d.tokens)}</p>
+                          <p className="text-xs text-muted-foreground">Token: <TokenDisplay n={d.tokens} /></p>
                           <p className="text-xs text-muted-foreground">请求: {d.requests}</p>
                           <p className="text-xs text-muted-foreground">延迟: {d.avgLatency}ms</p>
                         </div>
