@@ -21,23 +21,6 @@ _last_backend_model: contextvars.ContextVar[str] = contextvars.ContextVar("_last
 # Public ContextVar for per-request correlation ID. Set by routers.
 current_request_id: contextvars.ContextVar[str] = contextvars.ContextVar("current_request_id", default="")
 
-# Per-user locks to serialize streaming requests to the same backend session.
-# Prevents backend SSE-stream mixing when concurrent requests share a cookie.
-_user_stream_locks: dict[str, asyncio.Lock] = {}
-
-
-def _get_user_stream_lock(user_id: str) -> asyncio.Lock:
-    """Return a per-user asyncio.Lock, creating one if needed.
-
-    Serializes streaming backend calls so a backend that mixes SSE chunks
-    for concurrent same-session requests won't leak data across users.
-    """
-    lock = _user_stream_locks.get(user_id)
-    if lock is None:
-        lock = asyncio.Lock()
-        _user_stream_locks[user_id] = lock
-    return lock
-
 
 async def _get_user_channel_cookie(user_id: str, channel_id: int) -> str | None:
     """获取用户为指定 cookie 渠道提交的 cookie"""
@@ -169,35 +152,26 @@ async def proxy_request(
     logger.info(f"[PROXY] Request: POST {url} headers={safe_headers}")
 
     if stream:
-        # Only serialize cookie-based channels — backend may mix SSE streams
-        # that share the same session cookie. API-key channels are safe.
-        use_lock = (
-            user_id
-            and (not channel or channel.get("auth_type") == "cookie")
-        )
-        user_lock = _get_user_stream_lock(user_id) if use_lock else None
-        if user_lock:
-            await user_lock.acquire()
+        # Dedicated client per stream — independent TCP connection prevents
+        # backend from mixing SSE chunks across concurrent same-cookie requests.
+        stream_client = httpx.AsyncClient(timeout=httpx.Timeout(60.0, connect=5.0))
         try:
-            result = await _proxy_stream(client, url, headers, body_with_model, target_model)
+            result = await _proxy_stream(stream_client, url, headers, body_with_model, target_model)
         except BaseException:
-            if user_lock:
-                user_lock.release()
+            await stream_client.aclose()
             raise
         if isinstance(result, StreamingResponse):
-            if user_lock:
-                _orig_iter = result.body_iterator
-                async def _locked_stream(user_lock=user_lock):
-                    try:
-                        async for chunk in _orig_iter:
-                            yield chunk
-                    finally:
-                        user_lock.release()
-                result.body_iterator = _locked_stream()
+            _orig_iter = result.body_iterator
+            async def _closing_stream():
+                try:
+                    async for chunk in _orig_iter:
+                        yield chunk
+                finally:
+                    await stream_client.aclose()
+            result.body_iterator = _closing_stream()
             return result
-        # Backend returned non-streaming JSON — release lock immediately
-        if user_lock:
-            user_lock.release()
+        # Backend returned non-streaming JSON — close client immediately
+        await stream_client.aclose()
         return result
     else:
         return await _proxy_sync(client, url, headers, body_with_model, target_model)
