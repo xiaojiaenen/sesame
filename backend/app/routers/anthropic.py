@@ -72,10 +72,18 @@ async def anthropic_messages(
     key_info = await validate_key(api_key)
     if not key_info:
         return JSONResponse(status_code=401, content={"type": "error", "error": {"type": "authentication_error", "message": "Invalid or expired API key"}})
+    key_id = key_info["key_id"]
+    max_qpm = key_info["max_qpm"]
+    if key_info.get("role") == "admin":
+        from app.services.apikey_service import get_random_active_key
+        random_key = await get_random_active_key(exclude_key_id=key_id)
+        if random_key:
+            key_id = random_key["key_id"]
+            max_qpm = random_key["max_qpm"]
     auth = AuthUser(
         user_id=key_info["user_id"],
-        key_id=key_info["key_id"],
-        max_qpm=key_info["max_qpm"],
+        key_id=key_id,
+        max_qpm=max_qpm,
     )
 
     # Rate limit
