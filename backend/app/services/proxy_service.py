@@ -169,9 +169,13 @@ async def proxy_request(
     logger.info(f"[PROXY] Request: POST {url} headers={safe_headers}")
 
     if stream:
-        # Serialize streaming requests per user to prevent backend SSE mixing
-        # when concurrent requests share the same backend session/cookie.
-        user_lock = _get_user_stream_lock(user_id) if user_id else None
+        # Only serialize cookie-based channels — backend may mix SSE streams
+        # that share the same session cookie. API-key channels are safe.
+        use_lock = (
+            user_id
+            and (not channel or channel.get("auth_type") == "cookie")
+        )
+        user_lock = _get_user_stream_lock(user_id) if use_lock else None
         if user_lock:
             await user_lock.acquire()
         try:
