@@ -102,6 +102,7 @@ class UserInfo(BaseModel):
     user_id: str
     role: str
     is_active: bool
+    default_model: str | None = None
 
 
 # --- API Key ---

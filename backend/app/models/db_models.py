@@ -66,6 +66,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     preferred_channel_id: Mapped[int | None] = mapped_column(Integer)
     load_balance_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    default_model: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_beijing)
 
 

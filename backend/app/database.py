@@ -79,3 +79,9 @@ async def init_db():
             await conn.execute(text("ALTER TABLE request_logs ADD COLUMN api_format VARCHAR(16) DEFAULT NULL"))
         except Exception:
             pass
+
+        # v1.5 用户默认模型
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN default_model VARCHAR(64) DEFAULT NULL"))
+        except Exception:
+            pass

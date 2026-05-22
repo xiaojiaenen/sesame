@@ -18,8 +18,15 @@ import { EmptyState } from "@/components/empty-state";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Server, Key, Cookie, CheckCircle2, XCircle, Clock,
-  Trash2, Send, RefreshCw, Info, AlertTriangle
+  Trash2, Send, RefreshCw, Info, AlertTriangle, ChevronDown
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface ChannelItem {
   id: number;
@@ -39,6 +46,8 @@ export default function ChannelsPage() {
   // 用户偏好
   const [preferredChannelId, setPreferredChannelId] = useState<number | null>(null);
   const [loadBalanceEnabled, setLoadBalanceEnabled] = useState(true);
+  const [defaultModel, setDefaultModel] = useState<string>("");
+  const [models, setModels] = useState<{ external_model: string }[]>([]);
 
   // Cookie dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -58,13 +67,30 @@ export default function ChannelsPage() {
   const fetchChannels = async () => {
     setLoading(true);
     try {
-      const [data, prefs] = await Promise.all([
+      const [data, prefs, modelsData] = await Promise.all([
         apiFetch("/user/channels"),
         apiFetch("/user/preferences"),
+        apiFetch("/user/models"),
       ]);
-      setChannels(data.channels || data);
+      const channels = data.channels || data;
+      setChannels(channels);
       setPreferredChannelId(prefs.preferred_channel_id);
       setLoadBalanceEnabled(prefs.load_balance_enabled);
+      setDefaultModel(prefs.default_model || "");
+
+      // 合并模型映射 + 渠道自有模型，去重排序
+      const modelSet = new Set<string>();
+      (modelsData || []).forEach((m: any) => { if (m.external_model) modelSet.add(m.external_model); });
+      (channels || []).forEach((c: ChannelItem) => {
+        if (c.models) {
+          try {
+            const parsed = JSON.parse(c.models);
+            if (Array.isArray(parsed)) parsed.forEach((m: string) => modelSet.add(m));
+            else if (typeof parsed === "object") Object.keys(parsed).forEach((m) => modelSet.add(m));
+          } catch { /* ignore */ }
+        }
+      });
+      setModels(Array.from(modelSet).sort().map((m) => ({ external_model: m })));
     } catch (e: any) {
       toast.error(e.message || "加载渠道失败");
     } finally {
@@ -72,7 +98,7 @@ export default function ChannelsPage() {
     }
   };
 
-  const updatePreference = async (updates: { preferred_channel_id?: number | null; load_balance_enabled?: boolean }) => {
+  const updatePreference = async (updates: { preferred_channel_id?: number | null; load_balance_enabled?: boolean; default_model?: string | null }) => {
     try {
       const params = new URLSearchParams();
       if (updates.preferred_channel_id !== undefined) {
@@ -80,6 +106,9 @@ export default function ChannelsPage() {
       }
       if (updates.load_balance_enabled !== undefined) {
         params.append("load_balance_enabled", String(updates.load_balance_enabled));
+      }
+      if (updates.default_model !== undefined) {
+        params.append("default_model", updates.default_model ?? "");
       }
       await apiFetch(`/user/preferences?${params}`, { method: "PUT" });
       toast.success("偏好已更新");
@@ -295,6 +324,36 @@ export default function ChannelsPage() {
                 </div>
               </div>
             )}
+
+            {/* 默认模型 */}
+            <div className="pt-2 border-t border-border/50">
+              <div className="flex items-center gap-3">
+                <Label className="text-sm shrink-0">默认模型</Label>
+                <Select
+                  value={defaultModel || "__none__"}
+                  onValueChange={(v) => {
+                    const val = (!v || v === "__none__") ? "" : v;
+                    setDefaultModel(val);
+                    updatePreference({ default_model: val || null });
+                  }}
+                >
+                  <SelectTrigger className="w-[240px]">
+                    <SelectValue placeholder="未设置（需在请求中指定）" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">未设置（需在请求中指定）</SelectItem>
+                    {models.map((m) => (
+                      <SelectItem key={m.external_model} value={m.external_model}>
+                        {m.external_model}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                设置后，请求中未指定模型时将自动使用该默认模型。客户端只需配置 Base URL 和 API Key 即可使用。
+              </p>
+            </div>
           </CardContent>
         </Card>
       </motion.div>

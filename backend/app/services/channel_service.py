@@ -112,6 +112,36 @@ def select_channel(model: str | None = None) -> tuple[dict | None, str | None]:
     return top_priority[0]
 
 
+def select_channel_auto() -> tuple[dict | None, str | None]:
+    """跳过模型匹配，从所有活跃渠道中按权重随机选择一个。"""
+    if not _channels:
+        return None, None
+
+    active = [ch for ch in _channels if ch["status"] == "active"]
+    if not active:
+        return None, None
+
+    max_priority = max(c["priority"] for c in active)
+    top_priority = [c for c in active if c["priority"] == max_priority]
+
+    total_weight = sum(c["weight"] for c in top_priority)
+    if total_weight == 0:
+        chosen = random.choice(top_priority)
+        return chosen, None
+
+    r = random.randint(1, total_weight)
+    cumulative = 0
+    for ch in top_priority:
+        cumulative += ch["weight"]
+        if r <= cumulative:
+            backend_model = list(ch["models"].values())[0] if ch["models"] else None
+            return ch, backend_model
+
+    chosen = top_priority[0]
+    backend_model = list(chosen["models"].values())[0] if chosen["models"] else None
+    return chosen, backend_model
+
+
 async def create_channel(db: AsyncSession, **kwargs) -> Channel:
     channel = Channel(**kwargs)
     db.add(channel)

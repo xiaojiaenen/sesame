@@ -384,6 +384,7 @@ async def get_preferences(
     return {
         "preferred_channel_id": user.preferred_channel_id,
         "load_balance_enabled": user.load_balance_enabled if user.load_balance_enabled is not None else True,
+        "default_model": user.default_model,
     }
 
 
@@ -391,6 +392,7 @@ async def get_preferences(
 async def update_preferences(
     preferred_channel_id: int | None = None,
     load_balance_enabled: bool | None = None,
+    default_model: str | None = None,
     auth: AuthUser = Depends(get_jwt_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -401,6 +403,8 @@ async def update_preferences(
         update_data["preferred_channel_id"] = preferred_channel_id
     if load_balance_enabled is not None:
         update_data["load_balance_enabled"] = load_balance_enabled
+    if default_model is not None:
+        update_data["default_model"] = default_model if default_model != "" else None
     if update_data:
         await db.execute(update(User).where(User.user_id == auth.user_id).values(**update_data))
         await db.commit()
@@ -409,8 +413,48 @@ async def update_preferences(
         result = await db.execute(select(User).where(User.user_id == auth.user_id))
         user = result.scalar_one_or_none()
         if user:
-            set_user_prefs(auth.user_id, user.preferred_channel_id, user.load_balance_enabled if user.load_balance_enabled is not None else True)
+            set_user_prefs(auth.user_id, user.preferred_channel_id, user.load_balance_enabled if user.load_balance_enabled is not None else True, user.default_model)
     return {"status": "ok"}
+
+
+# --- Request Logs (用户自己的) ---
+
+
+@router.get("/logs")
+async def get_my_logs(
+    model: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    errors_only: bool = False,
+    limit: int = Query(100, le=1000),
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db),
+    auth: AuthUser = Depends(get_jwt_user),
+):
+    from app.services import log_service
+
+    logs = await log_service.get_logs(db, auth.user_id, model, start_date, end_date, limit, offset, errors_only)
+    total = await log_service.get_logs_count(db, auth.user_id, model, start_date, end_date, errors_only)
+    return {
+        "total": total,
+        "logs": [
+            {
+                "id": l.id,
+                "channel_id": l.channel_id,
+                "model": l.model,
+                "internal_model": l.internal_model,
+                "tokens_prompt": l.tokens_prompt,
+                "tokens_completion": l.tokens_completion,
+                "latency_ms": l.latency_ms,
+                "status_code": l.status_code,
+                "is_stream": l.is_stream,
+                "api_format": l.api_format,
+                "error_message": l.error_message,
+                "created_at": l.created_at.isoformat() if l.created_at else None,
+            }
+            for l in logs
+        ],
+    }
 
 
 # --- Usage Statistics (用户自己的) ---

@@ -78,7 +78,7 @@ export default function GuidePage() {
               </div>
               <div>
                 <CardTitle className="text-lg">快速开始</CardTitle>
-                <CardDescription>所有客户端通用配置信息</CardDescription>
+                <CardDescription>只需两步即可开始使用</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -101,6 +101,9 @@ export default function GuidePage() {
                 </p>
               </div>
             </div>
+            <p className="text-xs text-muted-foreground mt-4">
+              如果在 <Badge variant="secondary">渠道管理</Badge> 中设置了默认模型，就无需在客户端配置模型，只需 Base URL + API Key 即可。
+            </p>
           </CardContent>
         </Card>
       </motion.div>
@@ -157,7 +160,7 @@ export default function GuidePage() {
     "stream": false
   }'`} />
                 <p className="text-xs text-muted-foreground">
-                  Anthropic 格式使用 <code className="px-1 py-0.5 bg-muted rounded text-xs">x-api-key</code> 或 <code className="px-1 py-0.5 bg-muted rounded text-xs">Authorization: Bearer</code> 传递 Key。
+                  Anthropic 格式使用 <code className="px-1 py-0.5 bg-muted rounded text-xs">x-api-key</code> 或 <code className="px-1 py-0.5 bg-muted rounded text-xs">Authorization: Bearer</code> 传递 Key。设置默认模型后，请求中的 <code className="px-1 py-0.5 bg-muted rounded text-xs">model</code> 字段可省略。
                 </p>
               </TabsContent>
             </Tabs>
@@ -165,8 +168,52 @@ export default function GuidePage() {
         </Card>
       </motion.div>
 
-      {/* Cherry Studio */}
+      {/* 模型保留关键字 */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">模型字段说明</CardTitle>
+                <CardDescription>支持保留关键字，简化配置</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="p-3 rounded-lg border border-border/60 bg-muted/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline">default</Badge>
+                    <span className="text-sm font-medium text-foreground">使用默认模型</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    请求中的 <code className="px-1 py-0.5 bg-muted rounded text-xs">model</code> 设为 <code className="px-1 py-0.5 bg-muted rounded text-xs">default</code>，网关自动替换为你在渠道管理页设置的默认模型。
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg border border-border/60 bg-muted/30">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline">auto</Badge>
+                    <span className="text-sm font-medium text-foreground">自动选择</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    设为 <code className="px-1 py-0.5 bg-muted rounded text-xs">auto</code>，网关从所有活跃渠道中随机选一个可用模型。适合不关心具体模型的场景。
+                  </p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                如果指定了默认模型，<code className="px-1 py-0.5 bg-muted rounded text-xs">default</code> 和 <code className="px-1 py-0.5 bg-muted rounded text-xs">auto</code> 效果相同——都使用默认模型。不填 <code className="px-1 py-0.5 bg-muted rounded text-xs">model</code> 字段等同于 <code className="px-1 py-0.5 bg-muted rounded text-xs">default</code>。
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Cherry Studio */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-4">
             <div className="flex items-center gap-3">
@@ -195,8 +242,8 @@ export default function GuidePage() {
               <StepItem number={4} title="填写 API Key">
                 填入您在 Sesame Gateway 创建的 API Key。
               </StepItem>
-              <StepItem number={5} title="配置模型">
-                在模型列表中添加支持的模型名称，或点击刷新拉取。
+              <StepItem number={5} title="配置模型（可选）">
+                在模型列表中添加支持的模型名称，或点击刷新拉取。如果已在 Sesame Gateway 的 <Badge variant="secondary">渠道管理</Badge> 中设置了默认模型，可跳过此步骤。
               </StepItem>
             </div>
           </CardContent>

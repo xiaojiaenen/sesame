@@ -70,11 +70,27 @@ async def _proxy_request(request: Request, auth: AuthUser):
 
     # 检查用户偏好：是否使用指定渠道（从内存缓存读取，无 DB 查询）
     from app.services.user_pref_cache import get_user_prefs
-    pref_channel_id, load_balance = get_user_prefs(auth.user_id)
+    pref_channel_id, load_balance, default_model = get_user_prefs(auth.user_id)
     preferred_channel_id = pref_channel_id if not load_balance else None
 
-    # 检查是否有可用渠道
-    channel, backend_model = channel_service.select_channel(external_model)
+    # 模型匹配：处理保留名 "default" / "auto"，未匹配则回退默认模型
+    channel, backend_model = None, None
+
+    if not external_model or external_model in ("default", "auto"):
+        if external_model == "auto" and not default_model:
+            channel, backend_model = channel_service.select_channel_auto()
+            if channel:
+                external_model = backend_model or "auto"
+        else:
+            external_model = default_model or ""
+
+    if not channel:
+        channel, backend_model = channel_service.select_channel(external_model)
+
+    if not channel and default_model and external_model != default_model:
+        external_model = default_model
+        channel, backend_model = channel_service.select_channel(external_model)
+
     logger.info(f"[CHAT] model={external_model} user={auth.user_id} key_id={auth.key_id} selected_channel={channel['id'] if channel else None} backend_model={backend_model}")
     cookie = ""
 

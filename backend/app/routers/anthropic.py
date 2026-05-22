@@ -121,8 +121,27 @@ async def anthropic_messages(
     req_id = uuid.uuid4().hex[:12]
     current_request_id.set(req_id)
 
-    # 检查是否有可用渠道
-    channel, _ = channel_service.select_channel(external_model)
+    # 模型匹配：处理保留名 "default" / "auto"，未匹配则回退默认模型
+    from app.services.user_pref_cache import get_user_prefs
+    _, _, default_model = get_user_prefs(auth.user_id)
+
+    channel, backend_model = None, None
+
+    if not external_model or external_model in ("default", "auto"):
+        if external_model == "auto" and not default_model:
+            channel, backend_model = channel_service.select_channel_auto()
+            if channel:
+                external_model = backend_model or "auto"
+        else:
+            external_model = default_model or ""
+
+    if not channel:
+        channel, backend_model = channel_service.select_channel(external_model)
+
+    if not channel and default_model and external_model != default_model:
+        external_model = default_model
+        channel, backend_model = channel_service.select_channel(external_model)
+
     cookie = ""
 
     if not channel:
@@ -144,7 +163,7 @@ async def anthropic_messages(
 
     # 检查用户偏好
     from app.services.user_pref_cache import get_user_prefs
-    pref_channel_id, load_balance = get_user_prefs(auth.user_id)
+    pref_channel_id, load_balance, _ = get_user_prefs(auth.user_id)
     preferred_channel_id = pref_channel_id if not load_balance else None
 
     # ── 两层防护：并发控制 → 缓存 ──

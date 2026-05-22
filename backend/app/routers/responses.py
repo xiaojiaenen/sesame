@@ -87,8 +87,29 @@ async def responses_endpoint(request: Request):
     req_id = uuid.uuid4().hex[:12]
     current_request_id.set(req_id)
 
-    # 选择渠道
-    channel, _ = channel_service.select_channel(external_model)
+    # 检查用户偏好
+    from app.services.user_pref_cache import get_user_prefs
+    pref_channel_id, load_balance, default_model = get_user_prefs(auth.user_id)
+    preferred_channel_id = pref_channel_id if not load_balance else None
+
+    # 模型匹配：处理保留名 "default" / "auto"，未匹配则回退默认模型
+    channel, backend_model = None, None
+
+    if not external_model or external_model in ("default", "auto"):
+        if external_model == "auto" and not default_model:
+            channel, backend_model = channel_service.select_channel_auto()
+            if channel:
+                external_model = backend_model or "auto"
+        else:
+            external_model = default_model or ""
+
+    if not channel:
+        channel, backend_model = channel_service.select_channel(external_model)
+
+    if not channel and default_model and external_model != default_model:
+        external_model = default_model
+        channel, backend_model = channel_service.select_channel(external_model)
+
     if not channel:
         return JSONResponse(status_code=503, content={
             "error": {"type": "api_error", "message": "没有可用的 API 渠道，请先在管理后台创建渠道"}
@@ -97,11 +118,6 @@ async def responses_endpoint(request: Request):
     # 转换为 Chat Completions 格式
     openai_req = convert_responses_request_to_openai(responses_req)
     openai_body = json.dumps(openai_req, ensure_ascii=False).encode()
-
-    # 检查用户偏好
-    from app.services.user_pref_cache import get_user_prefs
-    pref_channel_id, load_balance = get_user_prefs(auth.user_id)
-    preferred_channel_id = pref_channel_id if not load_balance else None
 
     # ── 两层防护：并发控制 → 缓存 ──
     fingerprint = compute_fingerprint(openai_req, auth.user_id)

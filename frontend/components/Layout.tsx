@@ -128,6 +128,31 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </li>
           ))}
 
+          {/* 请求日志 - 普通用户可见（管理员在管理后台查看全部） */}
+          {user?.role !== "admin" && (
+            <li onClick={isMobile ? closeSidebar : undefined}>
+              <Link
+                href="/main/logs"
+                prefetch={true}
+                className={cn(
+                  "group flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 relative",
+                  pathname.startsWith("/main/logs")
+                    ? "text-primary font-medium bg-primary/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                )}
+              >
+                {pathname.startsWith("/main/logs") && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
+                )}
+                <FileText className={cn(
+                  "w-4 h-4 shrink-0 transition-colors",
+                  pathname.startsWith("/main/logs") ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+                )} />
+                <span>请求日志</span>
+              </Link>
+            </li>
+          )}
+
           {user?.role === "admin" && (
             <>
               <li className="my-3 mx-1">
