@@ -4,6 +4,7 @@ Redis 缓存 + 本地内存镜像，保证 sync/async 均可访问。
 """
 
 import json
+import logging
 import random
 
 from sqlalchemy import select, update
@@ -13,10 +14,13 @@ from app.cache import get_cache
 from app.models.db_models import Channel
 from app.utils import now_beijing
 
+logger = logging.getLogger("sesame.channel")
+
 CHANNELS_CACHE_KEY = "channels:list"
 
-# 本地内存镜像 — 供 sync 函数使用
-_channels: list[dict] = []
+# 本地内存镜像 — dict 做 O(1) 查找
+_channels: dict[int, dict] = {}
+_channels_list: list[dict] = []
 
 
 def _normalize_models(raw) -> dict:
@@ -30,68 +34,47 @@ def _normalize_models(raw) -> dict:
 
 
 async def load_channels_to_cache(db: AsyncSession) -> None:
-    global _channels
-    result = await db.execute(
-        select(Channel).where(Channel.is_enabled == True).order_by(Channel.priority.desc(), Channel.weight.desc())
-    )
-    rows = result.scalars().all()
-    data = [
-        {
-            "id": r.id,
-            "name": r.name,
-            "base_url": r.base_url,
-            "api_key": r.api_key,
-            "auth_type": r.auth_type or "api_key",
-            "models": _normalize_models(json.loads(r.models) if r.models else None),
-            "weight": r.weight,
-            "status": r.status,
-            "priority": r.priority,
-            "max_qps": r.max_qps,
-        }
-        for r in rows
-    ]
-    # 写入 Redis
-    cache = get_cache()
-    await cache.set(CHANNELS_CACHE_KEY, {"data": json.dumps(data, ensure_ascii=False)})
-    # 同步镜像
-    _channels = data
+    global _channels, _channels_list
+    try:
+        result = await db.execute(
+            select(Channel).where(Channel.is_enabled == True).order_by(Channel.priority.desc(), Channel.weight.desc())
+        )
+        rows = result.scalars().all()
+        data = [
+            {
+                "id": r.id,
+                "name": r.name,
+                "base_url": r.base_url,
+                "api_key": r.api_key,
+                "auth_type": r.auth_type or "api_key",
+                "models": _normalize_models(json.loads(r.models) if r.models else None),
+                "weight": r.weight,
+                "status": r.status,
+                "priority": r.priority,
+                "max_qps": r.max_qps,
+            }
+            for r in rows
+        ]
+        # 写入 Redis
+        cache = get_cache()
+        await cache.set(CHANNELS_CACHE_KEY, {"data": json.dumps(data, ensure_ascii=False)})
+        # 同步镜像
+        _channels_list = data
+        _channels = {ch["id"]: ch for ch in data}
+    except Exception as e:
+        logger.error(f"Failed to load channels to cache: {e}")
 
 
 def get_channels() -> list[dict]:
-    return _channels
+    return _channels_list
 
 
 def get_channel(channel_id: int) -> dict | None:
-    for ch in _channels:
-        if ch["id"] == channel_id:
-            return ch
-    return None
+    return _channels.get(channel_id)
 
 
-def select_channel(model: str | None = None) -> tuple[dict | None, str | None]:
-    if not _channels:
-        return None, None
-
-    exact = []
-    fallback = []
-    for ch in _channels:
-        if ch["status"] != "active":
-            continue
-        models = ch["models"]
-        if not models:
-            exact.append((ch, model))
-        elif model and model in models:
-            exact.append((ch, models[model]))
-        elif model and len(models) == 1:
-            exact.append((ch, list(models.values())[0]))
-        else:
-            unique_backends = set(models.values())
-            if len(unique_backends) == 1:
-                fallback.append((ch, unique_backends.pop()))
-            else:
-                fallback.append((ch, model))
-
-    candidates = exact or fallback
+def _weighted_random_select(candidates: list[tuple[dict, str | None]]) -> tuple[dict, str | None]:
+    """从候选列表中按优先级 + 权重随机选择一个渠道。"""
     if not candidates:
         return None, None
 
@@ -112,12 +95,39 @@ def select_channel(model: str | None = None) -> tuple[dict | None, str | None]:
     return top_priority[0]
 
 
+def select_channel(model: str | None = None) -> tuple[dict | None, str | None]:
+    if not _channels:
+        return None, None
+
+    exact = []
+    fallback = []
+    for ch in _channels_list:
+        if ch["status"] != "active":
+            continue
+        models = ch["models"]
+        if not models:
+            exact.append((ch, model))
+        elif model and model in models:
+            exact.append((ch, models[model]))
+        elif model and len(models) == 1:
+            exact.append((ch, list(models.values())[0]))
+        else:
+            unique_backends = set(models.values())
+            if len(unique_backends) == 1:
+                fallback.append((ch, unique_backends.pop()))
+            else:
+                fallback.append((ch, model))
+
+    candidates = exact or fallback
+    return _weighted_random_select(candidates)
+
+
 def select_channel_auto() -> tuple[dict | None, str | None]:
     """跳过模型匹配，从所有活跃渠道中按权重随机选择一个。"""
     if not _channels:
         return None, None
 
-    active = [ch for ch in _channels if ch["status"] == "active"]
+    active = [ch for ch in _channels_list if ch["status"] == "active"]
     if not active:
         return None, None
 
@@ -127,7 +137,8 @@ def select_channel_auto() -> tuple[dict | None, str | None]:
     total_weight = sum(c["weight"] for c in top_priority)
     if total_weight == 0:
         chosen = random.choice(top_priority)
-        return chosen, None
+        backend_model = list(chosen["models"].values())[0] if chosen["models"] else None
+        return chosen, backend_model
 
     r = random.randint(1, total_weight)
     cumulative = 0
