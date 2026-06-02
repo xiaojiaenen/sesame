@@ -24,6 +24,9 @@ export default function PlaygroundPage() {
   const [temperature, setTemperature] = useState("0.7");
   const [maxTokens, setMaxTokens] = useState("1024");
   const [stream, setStream] = useState(true);
+  const [apiKey, setApiKey] = useState(() =>
+    typeof window !== "undefined" ? localStorage.getItem("sesame_playground_key") || "" : ""
+  );
   const [response, setResponse] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [responseTime, setResponseTime] = useState<number | null>(null);
@@ -82,12 +85,14 @@ export default function PlaygroundPage() {
       abortRef.current = controller;
 
       try {
-        const token = localStorage.getItem("sesame_token");
+        if (!apiKey.trim()) {
+          throw new Error("请先输入 API Key");
+        }
         const resp = await fetch(`${getBaseUrl()}/v1/chat/completions`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            Authorization: `Bearer ${apiKey.trim()}`,
           },
           body: JSON.stringify(body),
           signal: controller.signal,
@@ -136,10 +141,20 @@ export default function PlaygroundPage() {
     } else {
       // 非流式请求
       try {
-        const data = await apiFetch("/v1/chat/completions", {
+        if (!apiKey.trim()) throw new Error("请先输入 API Key");
+        const resp = await fetch(`${getBaseUrl()}/v1/chat/completions`, {
           method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey.trim()}`,
+          },
           body: JSON.stringify(body),
         });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({}));
+          throw new Error(err.detail || err.message || `HTTP ${resp.status}`);
+        }
+        const data = await resp.json();
         const content = data.choices?.[0]?.message?.content || "";
         setResponse(content);
         setResponseTime(Date.now() - startTime);
@@ -171,14 +186,19 @@ export default function PlaygroundPage() {
       stream,
     };
 
-    const token = localStorage.getItem("sesame_token") || "YOUR_API_KEY";
+    const key = apiKey.trim() || "YOUR_API_KEY";
     const curl = `curl ${getBaseUrl()}/v1/chat/completions \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${token}" \\
+  -H "Authorization: Bearer ${key}" \\
   -d '${JSON.stringify(body, null, 2)}'`;
 
     navigator.clipboard.writeText(curl);
     toast.success("已复制 curl 命令");
+  };
+
+  const handleApiKeyChange = (value: string) => {
+    setApiKey(value);
+    localStorage.setItem("sesame_playground_key", value);
   };
 
   const handleClear = () => {
@@ -205,6 +225,19 @@ export default function PlaygroundPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* API Key */}
+              <div className="space-y-2">
+                <Label>API Key</Label>
+                <Input
+                  type="password"
+                  value={apiKey}
+                  onChange={e => handleApiKeyChange(e.target.value)}
+                  placeholder="sk-sesame-..."
+                  className="font-mono text-sm"
+                />
+                <p className="text-[10px] text-muted-foreground">在 API Key 管理页面创建，本地保存不会上传</p>
+              </div>
+
               {/* 模型选择 */}
               <div className="space-y-2">
                 <Label>模型</Label>
