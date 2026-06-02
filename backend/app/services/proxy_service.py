@@ -344,7 +344,7 @@ async def proxy_request(
         roles = [m.get("role", "?") for m in body["messages"]]
         logger.info(f"[PROXY] Message roles after reorder: {roles}")
     
-    modified_body = json.dumps(body, ensure_ascii=False).encode("utf-8")
+    modified_body = json.dumps(body, ensure_ascii=True).encode("ascii")
     logger.info(f"[PROXY] Modified body sent to backend: {modified_body[:1000]}")
     req_timeout = httpx.Timeout(300.0, connect=10.0)
 
