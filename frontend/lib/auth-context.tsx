@@ -1,6 +1,8 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getBaseUrl } from "@/lib/api";
+
+const TOKEN_KEY = "sesame_token";
 
 interface UserInfo {
   user_id: string;
@@ -24,10 +26,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
 
   useEffect(() => {
     const initAuth = async () => {
-      const storedToken = localStorage.getItem("sesame_token");
+      const storedToken = localStorage.getItem(TOKEN_KEY);
       if (storedToken) {
         setToken(storedToken);
         try {
@@ -40,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const userData = await res.json();
             setUser(userData);
           } else {
-            localStorage.removeItem("sesame_token");
+            localStorage.removeItem(TOKEN_KEY);
             setToken(null);
           }
         } catch (error) {
@@ -54,17 +58,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!isLoading) {
-      if (!token && pathname !== "/login") {
-        router.push("/login");
-      }
+    if (!isLoading && !token && pathname !== "/login") {
+      router.push("/login");
     }
   }, [token, isLoading, pathname, router]);
 
-  const login = (newToken: string) => {
-    localStorage.setItem("sesame_token", newToken);
+  const login = useCallback((newToken: string) => {
+    localStorage.setItem(TOKEN_KEY, newToken);
     setToken(newToken);
-    // Profile will be fetched on next render or we can fetch it immediately
     fetch(`${getBaseUrl()}/user/profile`, {
       headers: {
         Authorization: `Bearer ${newToken}`,
@@ -80,20 +81,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       .catch((error) => {
         console.error("Failed to fetch profile after login", error);
-        // Still redirect to dashboard, profile will be fetched on next mount
         router.push("/main/dashboard");
       });
-  };
+  }, [router]);
 
-  const logout = () => {
-    localStorage.removeItem("sesame_token");
+  const logout = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY);
     setToken(null);
     setUser(null);
     router.push("/login");
-  };
+  }, [router]);
+
+  const value = useMemo(
+    () => ({ token, user, login, logout, isLoading }),
+    [token, user, login, logout, isLoading]
+  );
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, isLoading }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

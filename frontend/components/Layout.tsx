@@ -3,7 +3,7 @@
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Key, Users,
@@ -13,6 +13,7 @@ import {
 import { Button } from "./ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "next-themes";
+import type { LucideIcon } from "lucide-react";
 
 const NAV_ITEMS = [
   { name: "仪表盘", href: "/main/dashboard", icon: LayoutDashboard },
@@ -40,6 +41,37 @@ const PAGE_TITLES: Record<string, string> = {
   usage: "用量统计",
   monitor: "实时监控",
 };
+
+function NavItem({ name, href, icon: Icon, isActive, onClick }: {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  isActive: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <li onClick={onClick}>
+      <Link
+        href={href}
+        className={cn(
+          "group flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 relative",
+          isActive
+            ? "text-primary font-medium bg-primary/5"
+            : "text-muted-foreground hover:text-foreground hover:bg-accent"
+        )}
+      >
+        {isActive && (
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
+        )}
+        <Icon className={cn(
+          "w-4 h-4 shrink-0 transition-colors",
+          isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+        )} />
+        <span>{name}</span>
+      </Link>
+    </li>
+  );
+}
 
 function SidebarSkeleton() {
   return (
@@ -85,12 +117,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const pageTitle = PAGE_TITLES[pathname.split("/").pop() || ""] || "芝麻智门";
 
+  const closeFn = isMobile ? closeSidebar : undefined;
+
   const sidebarContent = (
     <aside className={cn(
       "flex flex-col shrink-0 bg-card border-r border-border",
-      isMobile
-        ? "w-64 h-full"
-        : "w-64"
+      isMobile ? "w-64 h-full" : "w-64"
     )}>
       {/* Logo */}
       <div className="h-14 flex items-center gap-2.5 px-4 border-b border-border">
@@ -105,52 +137,23 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <nav className="flex-1 overflow-y-auto py-3 px-2.5 scrollbar-gutter-stable">
         <ul className="space-y-0.5">
           {NAV_ITEMS.map((item) => (
-            <li key={item.href} onClick={isMobile ? closeSidebar : undefined}>
-              <Link
-                href={item.href}
-                prefetch={true}
-                className={cn(
-                  "group flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 relative",
-                  pathname.startsWith(item.href)
-                    ? "text-primary font-medium bg-primary/5"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                )}
-              >
-                {pathname.startsWith(item.href) && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
-                )}
-                <item.icon className={cn(
-                  "w-4 h-4 shrink-0 transition-colors",
-                  pathname.startsWith(item.href) ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                )} />
-                <span>{item.name}</span>
-              </Link>
-            </li>
+            <NavItem
+              key={item.href}
+              {...item}
+              isActive={pathname.startsWith(item.href)}
+              onClick={closeFn}
+            />
           ))}
 
           {/* 请求日志 - 普通用户可见（管理员在管理后台查看全部） */}
           {user?.role !== "admin" && (
-            <li onClick={isMobile ? closeSidebar : undefined}>
-              <Link
-                href="/main/logs"
-                prefetch={true}
-                className={cn(
-                  "group flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 relative",
-                  pathname.startsWith("/main/logs")
-                    ? "text-primary font-medium bg-primary/5"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                )}
-              >
-                {pathname.startsWith("/main/logs") && (
-                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
-                )}
-                <FileText className={cn(
-                  "w-4 h-4 shrink-0 transition-colors",
-                  pathname.startsWith("/main/logs") ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                )} />
-                <span>请求日志</span>
-              </Link>
-            </li>
+            <NavItem
+              name="请求日志"
+              href="/main/logs"
+              icon={FileText}
+              isActive={pathname.startsWith("/main/logs")}
+              onClick={closeFn}
+            />
           )}
 
           {user?.role === "admin" && (
@@ -164,27 +167,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 </span>
               </li>
               {ADMIN_ITEMS.map((item) => (
-                <li key={item.href} onClick={isMobile ? closeSidebar : undefined}>
-                  <Link
-                    href={item.href}
-                    prefetch={true}
-                    className={cn(
-                      "group flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors duration-150 relative",
-                      pathname.startsWith(item.href)
-                        ? "text-primary font-medium bg-primary/5"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                    )}
-                  >
-                    {pathname.startsWith(item.href) && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary" />
-                    )}
-                    <item.icon className={cn(
-                      "w-4 h-4 shrink-0 transition-colors",
-                      pathname.startsWith(item.href) ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
-                    )} />
-                    <span>{item.name}</span>
-                  </Link>
-                </li>
+                <NavItem
+                  key={item.href}
+                  {...item}
+                  isActive={pathname.startsWith(item.href)}
+                  onClick={closeFn}
+                />
               ))}
             </>
           )}
@@ -269,7 +257,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </Button>
         </header>
         <div className="flex-1 overflow-y-auto">
-          <div className="p-4 md:p-8 max-w-[1440px]" key={pathname}>
+          <div className="p-4 md:p-8 max-w-[1440px]">
             {children}
           </div>
         </div>
