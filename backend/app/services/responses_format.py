@@ -11,22 +11,31 @@ import uuid
 
 def convert_responses_request_to_openai(req: dict) -> dict:
     """将 Responses API 请求转换为 Chat Completions 格式。"""
-    messages = []
+    system_messages = []
+    chat_messages = []
 
     # instructions → system message
     instructions = req.get("instructions")
     if instructions:
-        messages.append({"role": "system", "content": instructions})
+        system_messages.append({"role": "system", "content": instructions})
 
-    # input → messages
+    # input → messages (separate system/developer from chat messages)
     input_data = req.get("input", "")
     if isinstance(input_data, str):
-        messages.append({"role": "user", "content": input_data})
+        chat_messages.append({"role": "user", "content": input_data})
     elif isinstance(input_data, list):
         for item in input_data:
             msg = _convert_input_item(item)
-            if msg:
-                messages.append(msg)
+            if not msg:
+                continue
+            # system / developer messages must be at the beginning
+            if msg["role"] in ("system", "developer"):
+                msg["role"] = "system"
+                system_messages.append(msg)
+            else:
+                chat_messages.append(msg)
+
+    messages = system_messages + chat_messages
 
     # 构建 Chat Completions 请求
     openai_req = {

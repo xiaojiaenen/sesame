@@ -15,7 +15,12 @@ from app.auth import AuthUser
 from app.database import async_session
 from app.services import channel_service, proxy_service, rate_limit_service, log_service
 from app.services.proxy_service import current_request_id
-from app.services.websocket_service import broadcast_request_event
+from app.services.websocket_service import (
+    broadcast_request_event,
+    _channel_name as ws_channel_name,
+    _api_format as ws_api_format,
+    _user_agent as ws_user_agent,
+)
 from app.services.cache_service import (
     acquire_concurrency, release_concurrency,
     get_cached, set_cached, compute_fingerprint,
@@ -52,14 +57,9 @@ async def responses_endpoint(request: Request):
         })
     key_id = key_info["key_id"]
     max_qpm = key_info["max_qpm"]
-    if key_info.get("role") == "admin":
-        from app.services.apikey_service import get_random_active_key
-        random_key = await get_random_active_key(exclude_key_id=key_id)
-        if random_key:
-            key_id = random_key["key_id"]
-            max_qpm = random_key["max_qpm"]
     auth = AuthUser(
         user_id=key_info["user_id"],
+        role=key_info.get("role", "user"),
         key_id=key_id,
         max_qpm=max_qpm,
     )
@@ -74,6 +74,7 @@ async def responses_endpoint(request: Request):
 
     # 解析请求
     raw_body = await request.body()
+    logger.info(f"[RESPONSES] Raw request body: {raw_body[:1500]}")
     try:
         responses_req = json.loads(raw_body)
     except json.JSONDecodeError:
@@ -86,6 +87,8 @@ async def responses_endpoint(request: Request):
 
     req_id = uuid.uuid4().hex[:12]
     current_request_id.set(req_id)
+    ws_api_format.set("responses")
+    ws_user_agent.set(request.headers.get("user-agent", ""))
 
     # 检查用户偏好
     from app.services.user_pref_cache import get_user_prefs
@@ -96,12 +99,12 @@ async def responses_endpoint(request: Request):
     channel, backend_model = None, None
 
     if not external_model or external_model in ("default", "auto"):
-        if external_model == "auto" and not default_model:
+        if default_model:
+            external_model = default_model
+        else:
             channel, backend_model = channel_service.select_channel_auto()
             if channel:
                 external_model = backend_model or "auto"
-        else:
-            external_model = default_model or ""
 
     if not channel:
         channel, backend_model = channel_service.select_channel(external_model)
@@ -110,6 +113,9 @@ async def responses_endpoint(request: Request):
         external_model = default_model
         channel, backend_model = channel_service.select_channel(external_model)
 
+    if channel:
+        ws_channel_name.set(channel.get("name", ""))
+
     if not channel:
         return JSONResponse(status_code=503, content={
             "error": {"type": "api_error", "message": "没有可用的 API 渠道，请先在管理后台创建渠道"}
@@ -117,7 +123,10 @@ async def responses_endpoint(request: Request):
 
     # 转换为 Chat Completions 格式
     openai_req = convert_responses_request_to_openai(responses_req)
-    openai_body = json.dumps(openai_req, ensure_ascii=False).encode()
+    openai_body = json.dumps(openai_req, ensure_ascii=True).encode("ascii")
+    msg_roles = [m.get("role", "?") for m in openai_req.get("messages", [])]
+    logger.info(f"[RESPONSES] Converted messages roles: {msg_roles}")
+    logger.info(f"[RESPONSES] Converted request: {openai_body[:1500]}")
 
     # ── 两层防护：并发控制 → 缓存 ──
     fingerprint = compute_fingerprint(openai_req, auth.user_id)
@@ -145,6 +154,7 @@ async def responses_endpoint(request: Request):
             await broadcast_request_event(
                 event_type="request_end", user_id=auth.user_id, model=external_model,
                 latency_ms=duration_ms, status_code=200, is_stream=False,
+                tokens_prompt=tokens_prompt, tokens_completion=tokens_completion,
             )
             if auth.key_id:
                 await release_concurrency(auth.key_id)
@@ -160,34 +170,29 @@ async def responses_endpoint(request: Request):
 
     try:
         if stream:
-            if preferred_channel_id:
-                result = await proxy_service.proxy_request(
-                    cookie="",
-                    raw_body=openai_body,
-                    target_model=external_model,
-                    stream=True,
-                    user_id=auth.user_id,
-                    channel_id=preferred_channel_id,
-                )
-            else:
-                result = await proxy_service.proxy_request_with_retry(
-                    cookie="",
-                    raw_body=openai_body,
-                    target_model=external_model,
-                    stream=True,
-                    user_id=auth.user_id,
-                )
+            result = await proxy_service.proxy_request_with_retry(
+                cookie="",
+                raw_body=openai_body,
+                target_model=external_model,
+                stream=True,
+                user_id=auth.user_id,
+                role=auth.role,
+                channel_id=preferred_channel_id,
+            )
 
             # 后端返回 JSON 而非 SSE
             if isinstance(result, dict):
                 resp = convert_openai_response_to_responses(result, external_model)
                 usage = result.get("usage", {})
+                tokens_prompt = usage.get("prompt_tokens", 0)
+                tokens_completion = usage.get("completion_tokens", 0)
                 duration_ms = int((time.monotonic() - start) * 1000)
                 await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 200,
-                                   usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
+                                   tokens_prompt, tokens_completion)
                 await broadcast_request_event(
                     event_type="request_end", user_id=auth.user_id, model=external_model,
                     latency_ms=duration_ms, status_code=200, is_stream=False,
+                    tokens_prompt=tokens_prompt, tokens_completion=tokens_completion,
                 )
 
                 # 写入缓存（stream 请求但后端返回非流式 dict）
@@ -239,12 +244,19 @@ async def responses_endpoint(request: Request):
                     except Exception as e:
                         logger.error(f"[RESPONSES] Stream error: {type(e).__name__}: {e}")
                 finally:
+                    # 关闭底层 httpx 流式连接，防止连接泄漏导致后续请求窜乱
+                    try:
+                        if hasattr(result, 'body_iterator'):
+                            await result.body_iterator.aclose()
+                    except Exception:
+                        pass
                     duration_ms = int((time.monotonic() - _stream_start) * 1000)
                     await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 200,
                                        _tokens_prompt, _tokens_completion, is_stream=True)
                     await broadcast_request_event(
                         event_type="request_end", user_id=auth.user_id, model=external_model,
                         latency_ms=duration_ms, status_code=200, is_stream=True,
+                        tokens_prompt=_tokens_prompt, tokens_completion=_tokens_completion,
                     )
 
             return StreamingResponse(
@@ -255,33 +267,28 @@ async def responses_endpoint(request: Request):
 
         else:
             # 非流式
-            if preferred_channel_id:
-                result = await proxy_service.proxy_request(
-                    cookie="",
-                    raw_body=openai_body,
-                    target_model=external_model,
-                    stream=False,
-                    user_id=auth.user_id,
-                    channel_id=preferred_channel_id,
-                )
-            else:
-                result = await proxy_service.proxy_request_with_retry(
-                    cookie="",
-                    raw_body=openai_body,
-                    target_model=external_model,
-                    stream=False,
-                    user_id=auth.user_id,
-                )
+            result = await proxy_service.proxy_request_with_retry(
+                cookie="",
+                raw_body=openai_body,
+                target_model=external_model,
+                stream=False,
+                user_id=auth.user_id,
+                role=auth.role,
+                channel_id=preferred_channel_id,
+            )
 
             if isinstance(result, dict):
                 resp = convert_openai_response_to_responses(result, external_model)
                 usage = result.get("usage", {})
+                tokens_prompt = usage.get("prompt_tokens", 0)
+                tokens_completion = usage.get("completion_tokens", 0)
                 duration_ms = int((time.monotonic() - start) * 1000)
                 await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 200,
-                                   usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
+                                   tokens_prompt, tokens_completion)
                 await broadcast_request_event(
                     event_type="request_end", user_id=auth.user_id, model=external_model,
                     latency_ms=duration_ms, status_code=200, is_stream=False,
+                    tokens_prompt=tokens_prompt, tokens_completion=tokens_completion,
                 )
 
                 # 写入缓存
@@ -296,7 +303,8 @@ async def responses_endpoint(request: Request):
 
     except proxy_service.BackendAuthError:
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 401, error_message="后端认证失败")
+        req_body_str = raw_body.decode("utf-8", errors="replace")[:4096]
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 401, error_message="后端认证失败", request_body=req_body_str)
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
             status_code=401, error_message="认证失败",
@@ -306,7 +314,9 @@ async def responses_endpoint(request: Request):
         })
     except proxy_service.BackendError as e:
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 502, error_message=str(e))
+        req_body_str = raw_body.decode("utf-8", errors="replace")[:4096]
+        resp_body_str = (e.response_body or str(e))[:4096]
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 502, error_message=str(e), request_body=req_body_str, response_body=resp_body_str)
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
             status_code=502, error_message=str(e),
@@ -317,7 +327,8 @@ async def responses_endpoint(request: Request):
     except Exception as e:
         logger.exception(f"[RESPONSES] Unexpected error: {e}")
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 500, error_message=str(e))
+        req_body_str = raw_body.decode("utf-8", errors="replace")[:4096]
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 500, error_message=str(e), request_body=req_body_str)
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
             status_code=500, error_message=str(e),
@@ -331,7 +342,8 @@ async def responses_endpoint(request: Request):
 
 
 async def _log_request(user_id, key_id, model, duration_ms, status_code,
-                        tokens_prompt=0, tokens_completion=0, is_stream=False, error_message=None):
+                        tokens_prompt=0, tokens_completion=0, is_stream=False, error_message=None,
+                        request_body=None, response_body=None):
     internal_model = proxy_service._last_backend_model.get() or model
 
     async def _write():
@@ -341,7 +353,7 @@ async def _log_request(user_id, key_id, model, duration_ms, status_code,
                 internal_model=internal_model, tokens_prompt=tokens_prompt,
                 tokens_completion=tokens_completion, latency_ms=duration_ms,
                 status_code=status_code, is_stream=is_stream, api_format="responses",
-                error_message=error_message,
+                error_message=error_message, request_body=request_body, response_body=response_body,
             )
 
     import asyncio as _asyncio

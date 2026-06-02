@@ -19,7 +19,12 @@ from app.services.cache_service import (
     acquire_concurrency, release_concurrency,
     get_cached, set_cached, compute_fingerprint,
 )
-from app.services.websocket_service import broadcast_request_event
+from app.services.websocket_service import (
+    broadcast_request_event,
+    _channel_name as ws_channel_name,
+    _api_format as ws_api_format,
+    _user_agent as ws_user_agent,
+)
 from app.services.anthropic_format import (
     convert_anthropic_request_to_openai,
     convert_openai_response_to_anthropic,
@@ -74,14 +79,9 @@ async def anthropic_messages(
         return JSONResponse(status_code=401, content={"type": "error", "error": {"type": "authentication_error", "message": "Invalid or expired API key"}})
     key_id = key_info["key_id"]
     max_qpm = key_info["max_qpm"]
-    if key_info.get("role") == "admin":
-        from app.services.apikey_service import get_random_active_key
-        random_key = await get_random_active_key(exclude_key_id=key_id)
-        if random_key:
-            key_id = random_key["key_id"]
-            max_qpm = random_key["max_qpm"]
     auth = AuthUser(
         user_id=key_info["user_id"],
+        role=key_info.get("role", "user"),
         key_id=key_id,
         max_qpm=max_qpm,
     )
@@ -120,6 +120,8 @@ async def anthropic_messages(
 
     req_id = uuid.uuid4().hex[:12]
     current_request_id.set(req_id)
+    ws_api_format.set("anthropic")
+    ws_user_agent.set(request.headers.get("user-agent", ""))
 
     # 模型匹配：处理保留名 "default" / "auto"，未匹配则回退默认模型
     from app.services.user_pref_cache import get_user_prefs
@@ -128,12 +130,12 @@ async def anthropic_messages(
     channel, backend_model = None, None
 
     if not external_model or external_model in ("default", "auto"):
-        if external_model == "auto" and not default_model:
+        if default_model:
+            external_model = default_model
+        else:
             channel, backend_model = channel_service.select_channel_auto()
             if channel:
                 external_model = backend_model or "auto"
-        else:
-            external_model = default_model or ""
 
     if not channel:
         channel, backend_model = channel_service.select_channel(external_model)
@@ -143,6 +145,8 @@ async def anthropic_messages(
         channel, backend_model = channel_service.select_channel(external_model)
 
     cookie = ""
+    if channel:
+        ws_channel_name.set(channel.get("name", ""))
 
     if not channel:
         return JSONResponse(
@@ -159,7 +163,7 @@ async def anthropic_messages(
     # 转换请求格式
     openai_req = convert_anthropic_request_to_openai(anthropic_req)
     openai_req["model"] = external_model
-    openai_body = json.dumps(openai_req).encode()
+    openai_body = json.dumps(openai_req, ensure_ascii=True).encode("ascii")
 
     # 检查用户偏好
     from app.services.user_pref_cache import get_user_prefs
@@ -193,6 +197,7 @@ async def anthropic_messages(
             await broadcast_request_event(
                 event_type="request_end", user_id=auth.user_id, model=external_model,
                 latency_ms=duration_ms, status_code=200, is_stream=False,
+                tokens_prompt=tokens_prompt, tokens_completion=tokens_completion,
             )
             if auth.key_id:
                 await release_concurrency(auth.key_id)
@@ -210,22 +215,14 @@ async def anthropic_messages(
     try:
         if stream:
             # 流式响应 - 需要转换格式
-            if preferred_channel_id:
-                result = await proxy_service.proxy_request(
-                    cookie=cookie,
-                    raw_body=openai_body,
-                    target_model=external_model,
-                    stream=True,
-                    user_id=auth.user_id,
-                    channel_id=preferred_channel_id,
-                )
-            else:
-                result = await proxy_service.proxy_request_with_retry(
+            result = await proxy_service.proxy_request_with_retry(
                 cookie=cookie,
                 raw_body=openai_body,
                 target_model=external_model,
                 stream=True,
                 user_id=auth.user_id,
+                role=auth.role,
+                channel_id=preferred_channel_id,
             )
 
             # 后端返回了 JSON 而非 SSE（如模型不支持流式）
@@ -340,12 +337,19 @@ async def anthropic_messages(
                             "type": "message_stop",
                         })
                 finally:
+                    # 关闭底层 httpx 流式连接，防止连接泄漏导致后续请求窜乱
+                    try:
+                        if hasattr(result, 'body_iterator'):
+                            await result.body_iterator.aclose()
+                    except Exception:
+                        pass
                     # 流结束后记录日志（即使客户端断开也记录）
                     duration_ms = int((time.monotonic() - _stream_start) * 1000)
                     await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 200, _tokens_prompt, _tokens_completion, is_stream=True)
                     await broadcast_request_event(
                         event_type="request_end", user_id=auth.user_id, model=external_model,
                         latency_ms=duration_ms, status_code=200, is_stream=True,
+                        tokens_prompt=_tokens_prompt, tokens_completion=_tokens_completion,
                     )
 
             return StreamingResponse(
@@ -360,23 +364,15 @@ async def anthropic_messages(
             )
         else:
             # 非流式响应
-            if preferred_channel_id:
-                result = await proxy_service.proxy_request(
-                    cookie=cookie,
-                    raw_body=openai_body,
-                    target_model=external_model,
-                    stream=False,
-                    user_id=auth.user_id,
-                    channel_id=preferred_channel_id,
-                )
-            else:
-                result = await proxy_service.proxy_request_with_retry(
-                    cookie=cookie,
-                    raw_body=openai_body,
-                    target_model=external_model,
-                    stream=False,
-                    user_id=auth.user_id,
-                )
+            result = await proxy_service.proxy_request_with_retry(
+                cookie=cookie,
+                raw_body=openai_body,
+                target_model=external_model,
+                stream=False,
+                user_id=auth.user_id,
+                role=auth.role,
+                channel_id=preferred_channel_id,
+            )
 
             # 转换响应格式
             if isinstance(result, dict):
@@ -408,7 +404,8 @@ async def anthropic_messages(
 
     except proxy_service.BackendAuthError:
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 401, error_message="后端认证失败")
+        req_body_str = raw_body.decode("utf-8", errors="replace")[:4096]
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 401, error_message="后端认证失败", request_body=req_body_str)
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
             status_code=401, error_message="认证失败",
@@ -425,7 +422,9 @@ async def anthropic_messages(
         )
     except proxy_service.BackendError as e:
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 502, error_message=str(e))
+        req_body_str = raw_body.decode("utf-8", errors="replace")[:4096]
+        resp_body_str = (e.response_body or str(e))[:4096]
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 502, error_message=str(e), request_body=req_body_str, response_body=resp_body_str)
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
             status_code=502, error_message=str(e),
@@ -443,7 +442,8 @@ async def anthropic_messages(
     except Exception as e:
         logger.exception(f"[ANTHROPIC] Unexpected error: {e}")
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 500, error_message=str(e))
+        req_body_str = raw_body.decode("utf-8", errors="replace")[:4096]
+        await _log_request(auth.user_id, auth.key_id, external_model, duration_ms, 500, error_message=str(e), request_body=req_body_str)
         await broadcast_request_event(
             event_type="request_error", user_id=auth.user_id, model=external_model,
             status_code=500, error_message=str(e),
@@ -460,7 +460,7 @@ async def anthropic_messages(
             await release_concurrency(auth.key_id)
 
 
-async def _log_request(user_id: str, key_id: int | None, model: str, duration_ms: int, status_code: int, tokens_prompt: int = 0, tokens_completion: int = 0, is_stream: bool = False, error_message: str | None = None):
+async def _log_request(user_id: str, key_id: int | None, model: str, duration_ms: int, status_code: int, tokens_prompt: int = 0, tokens_completion: int = 0, is_stream: bool = False, error_message: str | None = None, request_body: str | None = None, response_body: str | None = None):
     """记录请求日志"""
     internal_model = proxy_service._last_backend_model.get() or model
 
@@ -479,6 +479,8 @@ async def _log_request(user_id: str, key_id: int | None, model: str, duration_ms
                 is_stream=is_stream,
                 api_format="anthropic",
                 error_message=error_message,
+                request_body=request_body,
+                response_body=response_body,
             )
 
     import asyncio as _asyncio

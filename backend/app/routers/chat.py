@@ -17,7 +17,12 @@ from app.services.cache_service import (
     acquire_concurrency, release_concurrency,
     get_cached, set_cached, compute_fingerprint,
 )
-from app.services.websocket_service import broadcast_request_event
+from app.services.websocket_service import (
+    broadcast_request_event,
+    _channel_name as ws_channel_name,
+    _api_format as ws_api_format,
+    _user_agent as ws_user_agent,
+)
 
 router = APIRouter()
 
@@ -67,6 +72,8 @@ async def _proxy_request(request: Request, auth: AuthUser):
 
     req_id = uuid.uuid4().hex[:12]
     current_request_id.set(req_id)
+    ws_api_format.set("openai")
+    ws_user_agent.set(request.headers.get("user-agent", ""))
 
     # 检查用户偏好：是否使用指定渠道（从内存缓存读取，无 DB 查询）
     from app.services.user_pref_cache import get_user_prefs
@@ -77,12 +84,12 @@ async def _proxy_request(request: Request, auth: AuthUser):
     channel, backend_model = None, None
 
     if not external_model or external_model in ("default", "auto"):
-        if external_model == "auto" and not default_model:
+        if default_model:
+            external_model = default_model
+        else:
             channel, backend_model = channel_service.select_channel_auto()
             if channel:
                 external_model = backend_model or "auto"
-        else:
-            external_model = default_model or ""
 
     if not channel:
         channel, backend_model = channel_service.select_channel(external_model)
@@ -92,6 +99,8 @@ async def _proxy_request(request: Request, auth: AuthUser):
         channel, backend_model = channel_service.select_channel(external_model)
 
     logger.info(f"[CHAT] model={external_model} user={auth.user_id} key_id={auth.key_id} selected_channel={channel['id'] if channel else None} backend_model={backend_model}")
+    if channel:
+        ws_channel_name.set(channel.get("name", ""))
     cookie = ""
 
     if not channel:
@@ -123,6 +132,7 @@ async def _proxy_request(request: Request, auth: AuthUser):
             await broadcast_request_event(
                 event_type="request_end", user_id=auth.user_id, model=external_model,
                 latency_ms=duration_ms, status_code=200, is_stream=False,
+                tokens_prompt=tokens_prompt, tokens_completion=tokens_completion,
             )
             if auth.key_id:
                 await release_concurrency(auth.key_id)
@@ -138,27 +148,20 @@ async def _proxy_request(request: Request, auth: AuthUser):
 
     # Proxy with retry support
     try:
-        if preferred_channel_id:
-            result = await proxy_service.proxy_request(
-                cookie=cookie,
-                raw_body=raw_body,
-                target_model=external_model,
-                stream=stream,
-                user_id=auth.user_id,
-                channel_id=preferred_channel_id,
-            )
-        else:
-            result = await proxy_service.proxy_request_with_retry(
-                cookie=cookie,
-                raw_body=raw_body,
-                target_model=external_model,
-                stream=stream,
-                user_id=auth.user_id,
-            )
+        result = await proxy_service.proxy_request_with_retry(
+            cookie=cookie,
+            raw_body=raw_body,
+            target_model=external_model,
+            stream=stream,
+            user_id=auth.user_id,
+            role=auth.role,
+            channel_id=preferred_channel_id,
+        )
     except proxy_service.BackendAuthError:
         logger.warning(f"[CHAT] BackendAuthError from {url if 'url' in dir() else 'unknown'}")
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, stream, 401, duration_ms, error_message="后端认证失败")
+        req_body_str = raw_body.decode("utf-8", errors="replace")[:4096]
+        await _log_request(auth.user_id, auth.key_id, external_model, stream, 401, duration_ms, error_message="后端认证失败", request_body=req_body_str)
         await broadcast_request_event(
             event_type="request_error",
             user_id=auth.user_id,
@@ -173,7 +176,9 @@ async def _proxy_request(request: Request, auth: AuthUser):
     except proxy_service.BackendError as e:
         logger.error(f"[CHAT] BackendError: {e}")
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, stream, 502, duration_ms, error_message=str(e))
+        req_body_str = raw_body.decode("utf-8", errors="replace")[:4096]
+        resp_body_str = (e.response_body or str(e))[:4096]
+        await _log_request(auth.user_id, auth.key_id, external_model, stream, 502, duration_ms, error_message=str(e), request_body=req_body_str, response_body=resp_body_str)
         await broadcast_request_event(
             event_type="request_error",
             user_id=auth.user_id,
@@ -188,7 +193,8 @@ async def _proxy_request(request: Request, auth: AuthUser):
     except Exception as e:
         logger.exception(f"[CHAT] Unexpected error: {e}")
         duration_ms = int((time.monotonic() - start) * 1000)
-        await _log_request(auth.user_id, auth.key_id, external_model, stream, 500, duration_ms, error_message=str(e))
+        req_body_str = raw_body.decode("utf-8", errors="replace")[:4096]
+        await _log_request(auth.user_id, auth.key_id, external_model, stream, 500, duration_ms, error_message=str(e), request_body=req_body_str)
         await broadcast_request_event(
             event_type="request_error",
             user_id=auth.user_id,
@@ -213,6 +219,7 @@ async def _proxy_request(request: Request, auth: AuthUser):
         await broadcast_request_event(
             event_type="request_end", user_id=auth.user_id, model=external_model,
             latency_ms=duration_ms, status_code=200, is_stream=False,
+            tokens_prompt=tokens_prompt, tokens_completion=tokens_completion,
         )
         await _log_request(auth.user_id, auth.key_id, external_model, False, 200, duration_ms, tokens_prompt, tokens_completion)
 
@@ -241,6 +248,11 @@ async def _proxy_request(request: Request, auth: AuthUser):
                         except Exception:
                             pass
             finally:
+                # 关闭底层 httpx 流式连接，防止连接泄漏导致后续请求窜乱
+                try:
+                    await _orig_iter.aclose()
+                except Exception:
+                    pass
                 duration_ms = int((time.monotonic() - _stream_start) * 1000)
                 await _log_request(auth.user_id, auth.key_id, external_model, True, 200, duration_ms, tp, tc)
 
@@ -261,7 +273,7 @@ async def _update_key_last_used(key_id: int):
         pass
 
 
-async def _log_request(user_id, key_id, external_model, stream, status_code, duration_ms, tokens_prompt=0, tokens_completion=0, error_message=None):
+async def _log_request(user_id, key_id, external_model, stream, status_code, duration_ms, tokens_prompt=0, tokens_completion=0, error_message=None, request_body=None, response_body=None):
     from app.services.proxy_service import _last_backend_model
     internal_model = _last_backend_model.get() or external_model
 
@@ -280,6 +292,8 @@ async def _log_request(user_id, key_id, external_model, stream, status_code, dur
                 is_stream=stream,
                 api_format="openai",
                 error_message=error_message,
+                request_body=request_body,
+                response_body=response_body,
             )
 
     import asyncio
