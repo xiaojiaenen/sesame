@@ -59,18 +59,6 @@ class SessionInfo(BaseModel):
     last_used_at: str | None = None
 
 
-class ModelMappingRequest(BaseModel):
-    external_model: str = Field(..., min_length=1, max_length=64)
-    internal_model: str = Field(..., min_length=1, max_length=64)
-    fallback_models: list[str] | None = None
-
-
-class ModelMappingInfo(BaseModel):
-    external_model: str
-    internal_model: str
-    fallback_models: list[str] | None = None
-
-
 # --- Health ---
 
 class HealthResponse(BaseModel):

@@ -15,12 +15,6 @@ CREATE TABLE IF NOT EXISTS session_logs (
     INDEX ix_session_logs_external_model (external_model)
 );
 
-CREATE TABLE IF NOT EXISTS model_mapping (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    external_model VARCHAR(64) UNIQUE NOT NULL,
-    internal_model VARCHAR(64) NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS user_sessions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id VARCHAR(64) NOT NULL,

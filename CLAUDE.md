@@ -31,7 +31,7 @@ uv sync
 ```bash
 cd frontend
 
-# Run development server
+# Run development server (uses Turbopack)
 npm run dev
 
 # Build for production
@@ -95,6 +95,25 @@ Admin UI (Next.js :3000)
 - **Format conversion**: `anthropic_format.py` and `responses_format.py` convert between Anthropic/Responses API formats and OpenAI Chat Completions format (the internal canonical format).
 - **Retry/failover**: `proxy_service.proxy_request_with_retry` loops through channels and fallback models on failure.
 
+**Services directory (`services/`):**
+
+| Service | Role |
+|---------|------|
+| `proxy_service.py` | HTTPX client, request proxying with retry/failover, streaming/non-streaming |
+| `channel_service.py` | Channel CRUD, weighted random selection, cache management |
+| `apikey_service.py` | API key CRUD, validation, cache |
+| `auth_service.py` | User CRUD, JWT token creation/verification |
+| `mapping_service.py` | Model mapping CRUD, cache |
+| `log_service.py` | Request logging (start + complete), usage stats aggregation |
+| `rate_limit_service.py` | Redis-based per-key QPM rate limiting |
+| `cache_service.py` | Concurrency control, request dedup, response caching |
+| `session_service.py` | User session management |
+| `user_pref_cache.py` | In-memory user preference cache |
+| `websocket_service.py` | WebSocket broadcast for real-time monitor |
+| `auto_login_service.py` | Cookie auto-refresh via credential re-login |
+| `anthropic_format.py` | Anthropic Messages ↔ OpenAI Chat format conversion |
+| `responses_format.py` | Responses API ↔ OpenAI Chat format conversion |
+
 ### Frontend (`frontend/`)
 
 - **Framework**: Next.js 15 (App Router) with React 19, TypeScript
@@ -105,7 +124,10 @@ Admin UI (Next.js :3000)
   - `/login` — public login
   - `/main/dashboard` — user dashboard
   - `/main/channels`, `/main/api-keys`, `/main/guide` — user self-service
-  - `/main/admin/*` — admin: users, api-keys, channels, logs, usage, monitor
+  - `/main/cookie` — per-channel cookie management
+  - `/main/logs` — request log viewer
+  - `/main/models` — available models
+  - `/main/admin/*` — admin: users, api-keys, channels, model-mapping, logs, usage, sessions, monitor
 
 ### Infrastructure
 

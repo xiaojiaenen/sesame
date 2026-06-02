@@ -29,15 +29,6 @@ class SessionLog(Base):
     )
 
 
-class ModelMapping(Base):
-    __tablename__ = "model_mapping"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    external_model: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    internal_model: Mapped[str] = mapped_column(String(64), nullable=False)
-    fallback_models: Mapped[str | None] = mapped_column(Text)  # JSON array of fallback models
-
-
 class UserSession(Base):
     __tablename__ = "user_sessions"
 
@@ -165,6 +156,8 @@ class RequestLog(Base):
     is_stream: Mapped[bool] = mapped_column(Boolean, default=False)
     api_format: Mapped[str | None] = mapped_column(String(16))  # "openai" / "anthropic"
     error_message: Mapped[str | None] = mapped_column(Text)
+    request_body: Mapped[str | None] = mapped_column(Text)
+    response_body: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=now_beijing)
 
     __table_args__ = (
