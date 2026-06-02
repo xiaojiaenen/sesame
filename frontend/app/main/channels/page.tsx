@@ -67,10 +67,9 @@ export default function ChannelsPage() {
   const fetchChannels = async () => {
     setLoading(true);
     try {
-      const [data, prefs, modelsData] = await Promise.all([
+      const [data, prefs] = await Promise.all([
         apiFetch("/user/channels"),
         apiFetch("/user/preferences"),
-        apiFetch("/user/models"),
       ]);
       const channels = data.channels || data;
       setChannels(channels);
@@ -78,9 +77,8 @@ export default function ChannelsPage() {
       setLoadBalanceEnabled(prefs.load_balance_enabled);
       setDefaultModel(prefs.default_model || "");
 
-      // 合并模型映射 + 渠道自有模型，去重排序
+      // 从渠道配置中提取可用模型，去重排序
       const modelSet = new Set<string>();
-      (modelsData || []).forEach((m: any) => { if (m.external_model) modelSet.add(m.external_model); });
       (channels || []).forEach((c: ChannelItem) => {
         if (c.models) {
           try {
@@ -147,15 +145,19 @@ export default function ChannelsPage() {
     setDialogChannel(ch);
     setCookieVal("");
     setCookieDetail(null);
+    setLoginPass("");
     setDialogOpen(true);
     // Fetch existing cookie detail
     try {
       const detail = await apiFetch(`/user/channels/${ch.id}/cookie`);
       setCookieDetail(detail);
-      // Pre-fill auto-login fields from saved data
+      // 从后端回填已保存的用户名和密码
       if (detail.username) {
         setLoginUser(detail.username);
         setLoginMode("auto");
+      }
+      if (detail.password) {
+        setLoginPass(detail.password);
       }
       if (detail.auto_refresh) {
         setAutoRefresh(detail.auto_refresh);

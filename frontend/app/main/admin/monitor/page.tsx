@@ -17,10 +17,17 @@ interface RequestEvent {
     user_id: string;
     model: string;
     tokens: number;
+    tokens_prompt: number;
+    tokens_completion: number;
+    token_rate: number;
     latency_ms: number;
     status_code: number;
     is_stream: boolean;
     error_message?: string;
+    channel_name: string;
+    api_format: string;
+    user_agent: string;
+    active_count: number;
   };
 }
 
@@ -86,18 +93,15 @@ export default function MonitorPage() {
           setStats(prev => {
             const newStats = { ...prev };
             newStats.totalRequests++;
+            newStats.activeRequests = data.data.active_count ?? prev.activeRequests;
 
-            if (data.type === 'request_start') {
-              newStats.activeRequests++;
-            } else if (data.type === 'request_end') {
-              newStats.activeRequests = Math.max(0, newStats.activeRequests - 1);
+            if (data.type === 'request_end') {
               if (data.data.latency_ms) {
                 newStats.avgLatency = Math.round(
                   (prev.avgLatency * (prev.totalRequests - 1) + data.data.latency_ms) / prev.totalRequests
                 );
               }
             } else if (data.type === 'request_error') {
-              newStats.activeRequests = Math.max(0, newStats.activeRequests - 1);
               newStats.errors++;
             }
 
@@ -312,10 +316,27 @@ export default function MonitorPage() {
                               {event.data.model}
                             </Badge>
                           </span>
-                          {event.data.tokens > 0 && (
+                          {event.data.channel_name && (
                             <span>
-                              <span className="text-muted-foreground text-xs">Token </span>
-                              <span className="font-medium text-xs tabular-nums">{event.data.tokens}</span>
+                              <span className="text-muted-foreground text-xs">渠道 </span>
+                              <span className="font-medium text-xs">{event.data.channel_name}</span>
+                            </span>
+                          )}
+                          {event.data.api_format && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0">{event.data.api_format}</Badge>
+                          )}
+                          {event.data.tokens_completion > 0 && (
+                            <span>
+                              <span className="text-muted-foreground text-xs">输入 </span>
+                              <span className="font-medium text-xs tabular-nums">{event.data.tokens_prompt}</span>
+                              <span className="text-muted-foreground text-xs"> / 输出 </span>
+                              <span className="font-medium text-xs tabular-nums">{event.data.tokens_completion}</span>
+                            </span>
+                          )}
+                          {event.data.token_rate > 0 && (
+                            <span>
+                              <span className="text-muted-foreground text-xs">速率 </span>
+                              <span className="font-medium text-xs tabular-nums">{event.data.token_rate} t/s</span>
                             </span>
                           )}
                           {event.data.latency_ms > 0 && (
@@ -324,6 +345,12 @@ export default function MonitorPage() {
                               <span className={`font-medium text-xs tabular-nums ${event.data.latency_ms > 5000 ? "text-destructive" : ""}`}>
                                 {event.data.latency_ms}ms
                               </span>
+                            </span>
+                          )}
+                          {event.data.user_agent && (
+                            <span>
+                              <span className="text-muted-foreground text-xs">UA </span>
+                              <span className="font-medium text-xs truncate max-w-[150px] inline-block align-bottom">{event.data.user_agent}</span>
                             </span>
                           )}
                           {event.data.is_stream && (
