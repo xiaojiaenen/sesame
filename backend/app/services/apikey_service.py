@@ -80,14 +80,18 @@ async def count_all_keys(db: AsyncSession) -> int:
 
 
 async def update_api_key(db: AsyncSession, key_id: int, user_id: str | None, **kwargs) -> bool:
+    # 使用 sentinel 区分 "未传参" 和 "显式传 None"
+    _UNSET = object()
     q = update(ApiKey).where(ApiKey.id == key_id)
     if user_id:
         q = q.where(ApiKey.user_id == user_id)
-    values = {k: v for k, v in kwargs.items() if v is not None}
+    values = {k: v for k, v in kwargs.items() if v is not _UNSET}
     if not values:
         return True
-    await db.execute(q.values(**values))
+    result = await db.execute(q.values(**values))
     await db.commit()
+    if result.rowcount == 0:
+        return False
     await _invalidate_cache(key_id)
     return True
 
@@ -104,22 +108,6 @@ async def delete_api_key(db: AsyncSession, key_id: int, user_id: str | None) -> 
     await db.commit()
     await _invalidate_cache(key_id)
     return True
-
-
-async def get_random_active_key(exclude_key_id: int | None = None) -> dict | None:
-    """从 Redis 缓存中随机选取一个活跃的 API Key（非自身）。"""
-    cache = get_cache()
-    candidates: list[dict] = []
-    keys = await cache.get_all_hash_keys()
-    for k in keys:
-        if k.startswith(KEY_HASH_PREFIX):
-            data = await cache.get(k)
-            if data and data.get("key_id") and data["key_id"] != exclude_key_id:
-                candidates.append(data)
-    if not candidates:
-        return None
-    import random
-    return random.choice(candidates)
 
 
 async def validate_key(token: str) -> dict | None:
@@ -166,13 +154,7 @@ async def disable_user_keys(db: AsyncSession, user_id: str):
     )
     await db.commit()
     # Invalidate cached keys for this user
-    cache = get_cache()
-    keys = await cache.get_all_hash_keys()
-    for k in keys:
-        if k.startswith(KEY_HASH_PREFIX):
-            data = await cache.get(k)
-            if data and data.get("user_id") == user_id:
-                await cache.delete(k)
+    await _invalidate_user_cache(user_id)
 
 
 async def load_keys_to_cache(db: AsyncSession):
@@ -186,8 +168,18 @@ async def load_keys_to_cache(db: AsyncSession):
         user_result = await db.execute(select(User.user_id, User.role).where(User.user_id.in_(user_ids)))
         for row in user_result:
             user_map[row.user_id] = row.role
+    # 批量写入缓存
+    cache = get_cache()
     for key in keys:
-        await _cache_key(key, user_map.get(key.user_id, "user"))
+        expire_ts = key.expire_at.timestamp() if key.expire_at else None
+        data = {
+            "key_id": key.id,
+            "user_id": key.user_id,
+            "role": user_map.get(key.user_id, "user"),
+            "max_qpm": key.max_qpm,
+            "expire_ts": expire_ts,
+        }
+        await cache.set(f"{KEY_HASH_PREFIX}{key.key_hash}", data)
 
 
 async def _cache_key(key: ApiKey, role: str = "user"):
@@ -201,6 +193,17 @@ async def _cache_key(key: ApiKey, role: str = "user"):
         "expire_ts": expire_ts,
     }
     await cache.set(f"{KEY_HASH_PREFIX}{key.key_hash}", data)
+
+
+async def _invalidate_user_cache(user_id: str):
+    """按 user_id 失效缓存——遍历 SCAN 后按 user_id 匹配删除。"""
+    cache = get_cache()
+    keys = await cache.get_all_hash_keys()
+    for k in keys:
+        if k.startswith(KEY_HASH_PREFIX):
+            data = await cache.get(k)
+            if data and data.get("user_id") == user_id:
+                await cache.delete(k)
 
 
 async def _invalidate_cache(key_id: int):

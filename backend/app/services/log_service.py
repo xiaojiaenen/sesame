@@ -1,5 +1,6 @@
 """日志服务 - 记录 API 调用日志和统计"""
 
+import logging
 from datetime import datetime, timedelta
 
 from sqlalchemy import select, func, and_, text
@@ -7,6 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.db_models import RequestLog, UsageStats
 from app.utils import now_beijing
+
+logger = logging.getLogger("sesame.log")
+
+# 日志 body 最大存储长度（字符）
+MAX_BODY_LOG_LENGTH = 4096
 
 
 async def log_request_start(
@@ -18,26 +24,30 @@ async def log_request_start(
     internal_model: str | None = None,
     is_stream: bool = False,
     api_format: str | None = None,
-) -> int:
-    """流式请求开始时写入占位日志，返回 log_id 供后续更新"""
-    log = RequestLog(
-        user_id=user_id,
-        key_id=key_id,
-        channel_id=channel_id,
-        model=model,
-        internal_model=internal_model,
-        tokens_prompt=0,
-        tokens_completion=0,
-        latency_ms=None,
-        status_code=None,
-        is_stream=is_stream,
-        api_format=api_format,
-    )
-    db.add(log)
-    await db.flush()
-    log_id = log.id
-    await db.commit()
-    return log_id
+) -> int | None:
+    """流式请求开始时写入占位日志，返回 log_id 供后续更新。失败返回 None。"""
+    try:
+        log = RequestLog(
+            user_id=user_id,
+            key_id=key_id,
+            channel_id=channel_id,
+            model=model,
+            internal_model=internal_model,
+            tokens_prompt=0,
+            tokens_completion=0,
+            latency_ms=None,
+            status_code=None,
+            is_stream=is_stream,
+            api_format=api_format,
+        )
+        db.add(log)
+        await db.flush()
+        log_id = log.id
+        await db.commit()
+        return log_id
+    except Exception as e:
+        logger.warning(f"Failed to log request start: {e}")
+        return None
 
 
 async def log_request_complete(
@@ -53,23 +63,27 @@ async def log_request_complete(
     error_message: str | None = None,
 ) -> None:
     """流式请求结束后更新日志并写入用量统计"""
-    log = await db.get(RequestLog, log_id)
-    if log is None:
-        return
-    log.tokens_prompt = tokens_prompt
-    log.tokens_completion = tokens_completion
-    log.latency_ms = latency_ms
-    log.status_code = status_code
-    log.error_message = error_message
-    await db.flush()
+    try:
+        log = await db.get(RequestLog, log_id)
+        if log is None:
+            logger.warning(f"Request log {log_id} not found, skipping update")
+            return
+        log.tokens_prompt = tokens_prompt
+        log.tokens_completion = tokens_completion
+        log.latency_ms = latency_ms
+        log.status_code = status_code
+        log.error_message = error_message
+        await db.flush()
 
-    await _upsert_usage_atomic(
-        db, user_id, key_id or 0, model,
-        tokens_prompt + tokens_completion,
-        tokens_prompt, tokens_completion,
-        latency_ms, status_code
-    )
-    await db.commit()
+        await _upsert_usage_atomic(
+            db, user_id, key_id or 0, model,
+            tokens_prompt + tokens_completion,
+            tokens_prompt, tokens_completion,
+            latency_ms, status_code
+        )
+        await db.commit()
+    except Exception as e:
+        logger.warning(f"Failed to complete request log {log_id}: {e}")
 
 
 async def log_request(
@@ -86,32 +100,45 @@ async def log_request(
     is_stream: bool = False,
     api_format: str | None = None,
     error_message: str | None = None,
+    request_body: str | None = None,
+    response_body: str | None = None,
 ) -> None:
-    """记录请求日志并使用原子 SQL 更新用量统计"""
-    log = RequestLog(
-        user_id=user_id,
-        key_id=key_id,
-        channel_id=channel_id,
-        model=model,
-        internal_model=internal_model,
-        tokens_prompt=tokens_prompt,
-        tokens_completion=tokens_completion,
-        latency_ms=latency_ms,
-        status_code=status_code,
-        is_stream=is_stream,
-        api_format=api_format,
-        error_message=error_message,
-    )
-    db.add(log)
-    await db.flush()
+    """记录请求日志并使用原子 SQL 更新用量统计。日志写入失败不影响主请求。"""
+    try:
+        # 截断过长的 body
+        if request_body and len(request_body) > MAX_BODY_LOG_LENGTH:
+            request_body = request_body[:MAX_BODY_LOG_LENGTH] + "...(truncated)"
+        if response_body and len(response_body) > MAX_BODY_LOG_LENGTH:
+            response_body = response_body[:MAX_BODY_LOG_LENGTH] + "...(truncated)"
 
-    await _upsert_usage_atomic(
-        db, user_id, key_id or 0, model,
-        tokens_prompt + tokens_completion,
-        tokens_prompt, tokens_completion,
-        latency_ms, status_code
-    )
-    await db.commit()
+        log = RequestLog(
+            user_id=user_id,
+            key_id=key_id,
+            channel_id=channel_id,
+            model=model,
+            internal_model=internal_model,
+            tokens_prompt=tokens_prompt,
+            tokens_completion=tokens_completion,
+            latency_ms=latency_ms,
+            status_code=status_code,
+            is_stream=is_stream,
+            api_format=api_format,
+            error_message=error_message,
+            request_body=request_body,
+            response_body=response_body,
+        )
+        db.add(log)
+        await db.flush()
+
+        await _upsert_usage_atomic(
+            db, user_id, key_id or 0, model,
+            tokens_prompt + tokens_completion,
+            tokens_prompt, tokens_completion,
+            latency_ms, status_code
+        )
+        await db.commit()
+    except Exception as e:
+        logger.warning(f"Failed to log request: {e}")
 
 
 async def _upsert_usage_atomic(
@@ -239,10 +266,23 @@ async def get_hourly_stats(db: AsyncSession, days: int = 1) -> list[dict]:
     ]
 
 
-async def get_daily_stats(db: AsyncSession, days: int = 30) -> list[dict]:
-    start_date = (now_beijing() - timedelta(days=days)).strftime("%Y-%m-%d")
+def _daily_stats_row(row) -> dict:
+    """统一的日统计行映射"""
+    return {
+        "date": row.date,
+        "total_requests": row.total_requests or 0,
+        "total_tokens": row.total_tokens or 0,
+        "total_prompt_tokens": row.total_prompt_tokens or 0,
+        "total_completion_tokens": row.total_completion_tokens or 0,
+        "avg_latency_ms": round(row.avg_latency_ms or 0, 2),
+        "error_count": row.error_count or 0,
+    }
 
-    result = await db.execute(
+
+async def _query_daily_stats(db: AsyncSession, days: int, user_id: str | None = None) -> list[dict]:
+    """通用的每日统计查询，可选按 user_id 过滤。"""
+    start_date = (now_beijing() - timedelta(days=days)).strftime("%Y-%m-%d")
+    query = (
         select(
             UsageStats.date,
             func.sum(UsageStats.total_requests).label("total_requests"),
@@ -256,20 +296,19 @@ async def get_daily_stats(db: AsyncSession, days: int = 30) -> list[dict]:
         .group_by(UsageStats.date)
         .order_by(UsageStats.date)
     )
+    if user_id:
+        query = query.where(UsageStats.user_id == user_id)
+    result = await db.execute(query)
+    return [_daily_stats_row(row) for row in result.all()]
 
-    rows = result.all()
-    return [
-        {
-            "date": row.date,
-            "total_requests": row.total_requests or 0,
-            "total_tokens": row.total_tokens or 0,
-            "total_prompt_tokens": row.total_prompt_tokens or 0,
-            "total_completion_tokens": row.total_completion_tokens or 0,
-            "avg_latency_ms": round(row.avg_latency_ms or 0, 2),
-            "error_count": row.error_count or 0,
-        }
-        for row in rows
-    ]
+
+async def get_daily_stats(db: AsyncSession, days: int = 30) -> list[dict]:
+    return await _query_daily_stats(db, days)
+
+
+async def get_daily_stats_for_user(db: AsyncSession, user_id: str, days: int = 30) -> list[dict]:
+    """指定用户的每日统计"""
+    return await _query_daily_stats(db, days, user_id=user_id)
 
 
 async def get_model_stats(db: AsyncSession, days: int = 30) -> list[dict]:
@@ -287,7 +326,6 @@ async def get_model_stats(db: AsyncSession, days: int = 30) -> list[dict]:
         .order_by(func.sum(UsageStats.total_tokens).desc())
     )
 
-    rows = result.all()
     return [
         {
             "model": row.model or "unknown",
@@ -295,7 +333,7 @@ async def get_model_stats(db: AsyncSession, days: int = 30) -> list[dict]:
             "total_tokens": row.total_tokens or 0,
             "avg_latency_ms": round(row.avg_latency_ms or 0, 2),
         }
-        for row in rows
+        for row in result.all()
     ]
 
 
@@ -314,7 +352,6 @@ async def get_user_stats(db: AsyncSession, days: int = 30) -> list[dict]:
         .order_by(func.sum(UsageStats.total_tokens).desc())
     )
 
-    rows = result.all()
     return [
         {
             "user_id": row.user_id,
@@ -322,47 +359,14 @@ async def get_user_stats(db: AsyncSession, days: int = 30) -> list[dict]:
             "total_tokens": row.total_tokens or 0,
             "avg_latency_ms": round(row.avg_latency_ms or 0, 2),
         }
-        for row in rows
-    ]
-
-
-async def get_daily_stats_for_user(db: AsyncSession, user_id: str, days: int = 30) -> list[dict]:
-    """指定用户的每日统计"""
-    start_date = (now_beijing() - timedelta(days=days)).strftime("%Y-%m-%d")
-
-    result = await db.execute(
-        select(
-            UsageStats.date,
-            func.sum(UsageStats.total_requests).label("total_requests"),
-            func.sum(UsageStats.total_tokens).label("total_tokens"),
-            func.sum(UsageStats.total_prompt_tokens).label("total_prompt_tokens"),
-            func.sum(UsageStats.total_completion_tokens).label("total_completion_tokens"),
-            func.avg(UsageStats.avg_latency_ms).label("avg_latency_ms"),
-            func.sum(UsageStats.error_count).label("error_count"),
-        )
-        .where(UsageStats.user_id == user_id)
-        .where(UsageStats.date >= start_date)
-        .group_by(UsageStats.date)
-        .order_by(UsageStats.date)
-    )
-
-    rows = result.all()
-    return [
-        {
-            "date": row.date,
-            "total_requests": row.total_requests or 0,
-            "total_tokens": row.total_tokens or 0,
-            "total_prompt_tokens": row.total_prompt_tokens or 0,
-            "total_completion_tokens": row.total_completion_tokens or 0,
-            "avg_latency_ms": round(row.avg_latency_ms or 0, 2),
-            "error_count": row.error_count or 0,
-        }
-        for row in rows
+        for row in result.all()
     ]
 
 
 async def get_user_summary(db: AsyncSession, user_id: str) -> dict:
-    """用户最近 7 天 / 30 天的汇总统计"""
+    """用户最近 7 天 / 30 天的汇总统计（并行查询）"""
+    import asyncio
+
     now = now_beijing()
     d7 = (now - timedelta(days=7)).strftime("%Y-%m-%d")
     d30 = (now - timedelta(days=30)).strftime("%Y-%m-%d")
@@ -389,9 +393,9 @@ async def get_user_summary(db: AsyncSession, user_id: str) -> dict:
             "errors": row.errors or 0,
         }
 
-    s7 = await _query(d7)
-    s30 = await _query(d30)
-    today_stats = await _query(today)
+    s7, s30, today_stats = await asyncio.gather(
+        _query(d7), _query(d30), _query(today)
+    )
 
     return {
         "today": today_stats,

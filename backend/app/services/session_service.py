@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
@@ -8,7 +9,14 @@ from app.config import settings
 from app.crypto import decrypt, encrypt
 from app.models.db_models import UserSession
 
+logger = logging.getLogger("sesame.session")
+
 SESSION_KEY_PREFIX = "sesame:session:"
+
+
+def _mask_cookie(cookie_value: str) -> str:
+    """统一的 cookie 脱敏逻辑。"""
+    return cookie_value[:8] + "..." if len(cookie_value) > 8 else "***"
 
 
 async def get_session(user_id: str) -> dict | None:
@@ -46,16 +54,9 @@ async def submit_session(
     days = expire_days or settings.default_cookie_expire_days
     expire_at = datetime.now(timezone.utc) + timedelta(days=days)
     encrypted = encrypt(cookie)
+    now_iso = datetime.now(timezone.utc).isoformat()
 
-    # Write to cache
-    cache = get_cache()
-    key = f"{SESSION_KEY_PREFIX}{user_id}"
-    await cache.hash_set(key, "cookie", encrypted)
-    await cache.hash_set(key, "status", "active")
-    await cache.hash_set(key, "expire_at", expire_at.isoformat())
-    await cache.hash_set(key, "last_used_at", "")
-
-    # Write to DB (upsert)
+    # DB 先写，保证数据一致性
     result = await db.execute(select(UserSession).where(UserSession.user_id == user_id))
     existing = result.scalar_one_or_none()
     if existing:
@@ -71,26 +72,33 @@ async def submit_session(
         ))
     await db.commit()
 
+    # DB 成功后再写缓存
+    cache = get_cache()
+    key = f"{SESSION_KEY_PREFIX}{user_id}"
+    await cache.hash_set(key, "cookie", encrypted)
+    await cache.hash_set(key, "status", "active")
+    await cache.hash_set(key, "expire_at", expire_at.isoformat())
+    await cache.hash_set(key, "last_used_at", now_iso)
+
     return {"user_id": user_id, "status": "active", "expire_at": expire_at.isoformat()}
 
 
 async def delete_session(db: AsyncSession, user_id: str) -> bool:
-    cache = get_cache()
-    key = f"{SESSION_KEY_PREFIX}{user_id}"
-    has_cached = await cache.hash_get(key, "cookie")
-    
-    # Clear cache regardless
-    if has_cached:
-        await cache.hash_set(key, "status", "expired")
-
-    # Always update DB (handles orphaned records after cache clear)
+    # 先更新 DB
     result = await db.execute(
         update(UserSession)
         .where(UserSession.user_id == user_id, UserSession.status == "active")
         .values(status="revoked")
     )
     await db.commit()
-    
+
+    # 再清除缓存（直接删除 hash key，而非仅标记 expired）
+    cache = get_cache()
+    key = f"{SESSION_KEY_PREFIX}{user_id}"
+    has_cached = await cache.hash_get(key, "cookie")
+    if has_cached:
+        await cache.delete(key)
+
     return has_cached is not None or result.rowcount > 0
 
 
@@ -104,7 +112,7 @@ async def list_sessions() -> list[dict]:
         user_id = key[len(SESSION_KEY_PREFIX):]
         data = await cache.hash_get_all(key)
         if "cookie" in data:
-            data["cookie"] = data["cookie"][:8] + "..." if len(data["cookie"]) > 8 else "***"
+            data["cookie"] = _mask_cookie(data["cookie"])
         data["user_id"] = user_id
         results.append(data)
     return results
@@ -117,7 +125,7 @@ async def get_session_detail(user_id: str) -> dict | None:
     if not data:
         return None
     if "cookie" in data:
-        data["cookie"] = data["cookie"][:8] + "..." if len(data["cookie"]) > 8 else "***"
+        data["cookie"] = _mask_cookie(data["cookie"])
     data["user_id"] = user_id
     return data
 
