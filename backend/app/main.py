@@ -145,6 +145,50 @@ async def _cookie_check_loop():
             logger.warning(f"Cookie check loop error: {e}")
 
 
+async def _channel_health_loop():
+    """定时检测所有渠道健康状态（每 5 分钟检查一次）"""
+    while True:
+        await asyncio.sleep(300)
+        try:
+            from app.services import channel_service
+            from app.services.proxy_service import get_client
+            import httpx
+
+            channels = channel_service.get_channels()
+            if not channels:
+                continue
+
+            client = await get_client()
+            for ch in channels:
+                if not ch.get("base_url"):
+                    continue
+                try:
+                    url = f"{ch['base_url']}/v1/models"
+                    headers = {}
+                    if ch.get("api_key"):
+                        headers["Authorization"] = f"Bearer {ch['api_key']}"
+                    resp = await client.get(url, headers=headers, timeout=httpx.Timeout(10.0, connect=5.0))
+                    if resp.status_code in (200, 401, 403):
+                        new_status = "active"
+                        error_msg = None
+                    else:
+                        new_status = "error"
+                        error_msg = f"HTTP {resp.status_code}"
+                except Exception as e:
+                    new_status = "error"
+                    error_msg = str(e)[:200]
+
+                if ch.get("status") != new_status:
+                    try:
+                        async with async_session() as db:
+                            await channel_service.update_channel_status(db, ch["id"], new_status, error_msg)
+                        logger.info(f"[HEALTH] Channel {ch['name']} status: {ch.get('status')} -> {new_status}")
+                    except Exception as e:
+                        logger.warning(f"[HEALTH] Failed to update channel {ch['name']}: {e}")
+        except Exception as e:
+            logger.warning(f"Channel health check loop error: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Initializing database...")
@@ -166,22 +210,26 @@ async def lifespan(app: FastAPI):
         logger.info("User preferences cached.")
 
     cookie_task = asyncio.create_task(_cookie_check_loop())
+    health_task = asyncio.create_task(_channel_health_loop())
 
-    def _cookie_task_done(task: asyncio.Task):
+    def _bg_task_done(task: asyncio.Task):
         if task.cancelled():
             return
         exc = task.exception()
         if exc:
-            logger.error(f"Cookie check loop crashed: {exc}")
+            logger.error(f"Background task crashed: {exc}")
 
-    cookie_task.add_done_callback(_cookie_task_done)
+    cookie_task.add_done_callback(_bg_task_done)
+    health_task.add_done_callback(_bg_task_done)
     logger.info("Application startup complete.")
     yield
     cookie_task.cancel()
-    try:
-        await asyncio.wait_for(cookie_task, timeout=5)
-    except (asyncio.CancelledError, asyncio.TimeoutError):
-        pass
+    health_task.cancel()
+    for t in (cookie_task, health_task):
+        try:
+            await asyncio.wait_for(t, timeout=5)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass
     from app.services.proxy_service import close_client
     from app.cache import close_redis
     from app.database import engine

@@ -13,7 +13,6 @@ from app.models.schemas import (
     ApiKeyUpdate,
     AutoLoginRequest,
     CookieSubmit,
-    ModelMappingInfo,
     TokenResponse,
     UserInfo,
     UserLogin,
@@ -21,7 +20,7 @@ from app.models.schemas import (
 from sqlalchemy import select, and_
 from app.utils import now_beijing
 from app.models.db_models import UserChannelCookie
-from app.services import apikey_service, channel_service, mapping_service, proxy_service
+from app.services import apikey_service, channel_service, proxy_service
 from app.services.auth_service import create_access_token, get_user, verify_password
 
 router = APIRouter(prefix="/user")
@@ -42,6 +41,27 @@ async def profile(
     auth: AuthUser = Depends(get_jwt_user),
 ):
     return UserInfo(user_id=auth.user_id, role=auth.role, is_active=True)
+
+
+@router.put("/password")
+async def change_password(
+    old_password: str,
+    new_password: str,
+    auth: AuthUser = Depends(get_jwt_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """用户修改自己的密码"""
+    from app.services.auth_service import hash_password
+    user = await get_user(db, auth.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if not verify_password(old_password, user.password_hash):
+        raise HTTPException(status_code=400, detail="原密码错误")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="新密码长度不能少于 6 位")
+    user.password_hash = await hash_password(new_password)
+    await db.commit()
+    return {"message": "密码修改成功"}
 
 
 # --- Channel Management (用户侧) ---
@@ -171,6 +191,13 @@ async def get_channel_cookie(
     except Exception:
         plain = ""
     preview = plain[:8] + "..." if len(plain) > 8 else "***"
+    # 解密已保存的密码（如果有的话）
+    saved_password = ""
+    if ucc.password_encrypted:
+        try:
+            saved_password = decrypt(ucc.password_encrypted)
+        except Exception:
+            saved_password = ""
     expired = ucc.expire_at and ucc.expire_at < now_beijing()
     return {
         "status": "expired" if expired else ucc.status,
@@ -178,6 +205,7 @@ async def get_channel_cookie(
         "cookie_preview": preview,
         "login_url": ucc.login_url or "",
         "username": ucc.username or "",
+        "password": saved_password,
         "auto_refresh": ucc.auto_refresh or False,
     }
 
@@ -363,9 +391,14 @@ async def reveal_key(
     return {"api_key": full_key}
 
 
-@router.get("/models", response_model=list[ModelMappingInfo])
+@router.get("/models")
 async def list_models():
-    return await mapping_service.list_mappings()
+    """返回所有渠道中配置的可用模型列表"""
+    models = set()
+    for ch in channel_service.get_channels():
+        for model_name in ch.get("models", {}).keys():
+            models.add(model_name)
+    return [{"external_model": m} for m in sorted(models)]
 
 
 # --- User Preferences ---
@@ -450,6 +483,8 @@ async def get_my_logs(
                 "is_stream": l.is_stream,
                 "api_format": l.api_format,
                 "error_message": l.error_message,
+                "request_body": l.request_body,
+                "response_body": l.response_body,
                 "created_at": l.created_at.isoformat() if l.created_at else None,
             }
             for l in logs
@@ -479,3 +514,41 @@ async def get_my_usage_summary(
     from app.services.log_service import get_user_summary
     stats = await get_user_summary(db, auth.user_id)
     return stats
+
+
+@router.get("/usage/by-model")
+async def get_my_usage_by_model(
+    days: int = Query(30, le=365),
+    auth: AuthUser = Depends(get_jwt_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """用户自己的模型用量分布"""
+    from datetime import timedelta
+    from sqlalchemy import func, select
+    from app.models.db_models import UsageStats
+    from app.utils import now_beijing
+
+    start_date = (now_beijing() - timedelta(days=days)).strftime("%Y-%m-%d")
+    result = await db.execute(
+        select(
+            UsageStats.model,
+            func.sum(UsageStats.total_requests).label("total_requests"),
+            func.sum(UsageStats.total_tokens).label("total_tokens"),
+            func.sum(UsageStats.total_prompt_tokens).label("prompt_tokens"),
+            func.sum(UsageStats.total_completion_tokens).label("completion_tokens"),
+        )
+        .where(UsageStats.user_id == auth.user_id)
+        .where(UsageStats.date >= start_date)
+        .group_by(UsageStats.model)
+        .order_by(func.sum(UsageStats.total_tokens).desc())
+    )
+    return [
+        {
+            "model": row.model or "unknown",
+            "total_requests": row.total_requests or 0,
+            "total_tokens": row.total_tokens or 0,
+            "prompt_tokens": row.prompt_tokens or 0,
+            "completion_tokens": row.completion_tokens or 0,
+        }
+        for row in result.all()
+    ]

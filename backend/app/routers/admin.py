@@ -1,14 +1,14 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import AuthUser, get_admin_user
 from app.database import get_db
 from app.models.schemas import (
-    ModelMappingInfo,
-    ModelMappingRequest,
     UserCreate,
 )
-from app.services import apikey_service, auth_service, mapping_service
+from app.services import apikey_service, auth_service
 from app.services import channel_service, log_service
 from app.services.websocket_service import manager
 
@@ -67,6 +67,25 @@ async def disable_user(
     return {"status": "disabled", "user_id": user_id}
 
 
+@router.put("/users/{user_id}/reset-password")
+async def reset_user_password(
+    user_id: str,
+    new_password: str,
+    db: AsyncSession = Depends(get_db),
+    _: AuthUser = Depends(get_admin_user),
+):
+    """管理员重置用户密码"""
+    from app.services.auth_service import hash_password
+    user = await auth_service.get_user(db, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="密码长度不能少于 6 位")
+    user.password_hash = await hash_password(new_password)
+    await db.commit()
+    return {"message": f"用户 {user_id} 密码已重置"}
+
+
 # --- Global API Key View ---
 
 @router.get("/api-keys")
@@ -107,36 +126,6 @@ async def force_delete_key(
     if not deleted:
         raise HTTPException(status_code=404, detail="API Key 不存在")
     return {"status": "deleted", "key_id": key_id}
-
-
-# --- Model Mapping ---
-
-@router.get("/model-mapping", response_model=list[ModelMappingInfo])
-async def list_model_mappings(_: AuthUser = Depends(get_admin_user)):
-    return await mapping_service.list_mappings()
-
-
-@router.post("/model-mapping")
-async def upsert_model_mapping(
-    req: ModelMappingRequest,
-    db: AsyncSession = Depends(get_db),
-    _: AuthUser = Depends(get_admin_user),
-):
-    fallback_models = req.fallback_models if hasattr(req, 'fallback_models') else None
-    await mapping_service.upsert_mapping(db, req.external_model, req.internal_model, fallback_models)
-    return {"status": "ok", "external_model": req.external_model, "internal_model": req.internal_model}
-
-
-@router.delete("/model-mapping/{external_model}")
-async def delete_model_mapping(
-    external_model: str,
-    db: AsyncSession = Depends(get_db),
-    _: AuthUser = Depends(get_admin_user),
-):
-    deleted = await mapping_service.delete_mapping(db, external_model)
-    if not deleted:
-        raise HTTPException(status_code=404, detail="映射不存在")
-    return {"status": "deleted"}
 
 
 # --- Channels (多渠道支持) ---
@@ -273,16 +262,58 @@ async def test_channel(
     import httpx
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.get(
-                f"{channel['base_url']}/v1/models",
-                headers={"Authorization": f"Bearer {channel['api_key']}"},
-            )
-            if resp.status_code == 200:
-                await channel_service.update_channel_status(db, channel_id, "active")
-                return {"status": "ok", "message": "连接成功"}
+            if channel.get("auth_type") == "cookie":
+                # cookie 渠道：尝试用一个最小请求测试连通性
+                # 先尝试获取任意一个活跃 cookie
+                from app.services.proxy_service import _get_random_user_cookie
+                test_cookie = None
+                result = await _get_random_user_cookie(channel_id)
+                if result:
+                    test_cookie, _ = result
+
+                if test_cookie:
+                    # 有 cookie，发送最小 chat 请求验证
+                    test_body = json.dumps({
+                        "model": list(channel.get("models", {}).values())[0] if channel.get("models") else "test",
+                        "messages": [{"role": "user", "content": "hi"}],
+                        "max_tokens": 1,
+                        "stream": False,
+                    }).encode()
+                    resp = await client.post(
+                        f"{channel['base_url']}/agents/baitong/chat/completions",
+                        content=test_body,
+                        headers={"Cookie": test_cookie, "Content-Type": "application/json"},
+                    )
+                    if resp.status_code == 200:
+                        await channel_service.update_channel_status(db, channel_id, "active")
+                        return {"status": "ok", "message": "连接成功（Cookie 有效）"}
+                    elif resp.status_code == 401:
+                        await channel_service.update_channel_status(db, channel_id, "error", "Cookie 已失效")
+                        return {"status": "error", "message": "Cookie 已失效"}
+                    else:
+                        await channel_service.update_channel_status(db, channel_id, "error", f"HTTP {resp.status_code}")
+                        return {"status": "error", "message": f"HTTP {resp.status_code}"}
+                else:
+                    # 没有 cookie，仅测试基础连通性
+                    try:
+                        resp = await client.get(channel['base_url'])
+                        await channel_service.update_channel_status(db, channel_id, "active")
+                        return {"status": "ok", "message": "基础连通正常（无可用 Cookie 验证）"}
+                    except Exception:
+                        await channel_service.update_channel_status(db, channel_id, "error", "无法连接到后端")
+                        return {"status": "error", "message": "无法连接到后端"}
             else:
-                await channel_service.update_channel_status(db, channel_id, "error", f"HTTP {resp.status_code}")
-                return {"status": "error", "message": f"HTTP {resp.status_code}"}
+                # api_key 渠道：测试 /v1/models
+                resp = await client.get(
+                    f"{channel['base_url']}/v1/models",
+                    headers={"Authorization": f"Bearer {channel['api_key']}"},
+                )
+                if resp.status_code == 200:
+                    await channel_service.update_channel_status(db, channel_id, "active")
+                    return {"status": "ok", "message": "连接成功"}
+                else:
+                    await channel_service.update_channel_status(db, channel_id, "error", f"HTTP {resp.status_code}")
+                    return {"status": "error", "message": f"HTTP {resp.status_code}"}
     except Exception as e:
         await channel_service.update_channel_status(db, channel_id, "error", str(e))
         return {"status": "error", "message": str(e)}
@@ -321,6 +352,8 @@ async def list_logs(
                 "is_stream": l.is_stream,
                 "api_format": l.api_format,
                 "error_message": l.error_message,
+                "request_body": l.request_body,
+                "response_body": l.response_body,
                 "created_at": l.created_at.isoformat() if l.created_at else None,
             }
             for l in logs
