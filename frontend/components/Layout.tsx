@@ -121,16 +121,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   const sidebarContent = (
     <aside className={cn(
-      "flex flex-col shrink-0 bg-card border-r border-border",
+      "flex flex-col shrink-0 bg-card shadow-[inset_-1px_0_0_var(--border)]",
       isMobile ? "w-64 h-full" : "w-64"
     )}>
       {/* Logo */}
-      <div className="h-14 flex items-center gap-2.5 px-4 border-b border-border">
+      <div className="h-14 flex items-center gap-2.5 px-4 relative">
         <img src="/logo.svg" alt="Sesame" className="w-7 h-7" />
         <div className="leading-none">
           <div className="font-bold text-sm text-foreground tracking-tight">Sesame</div>
           <div className="text-[10px] text-muted-foreground mt-0.5">芝麻智门</div>
         </div>
+        <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-primary/20 via-primary/5 to-transparent" />
       </div>
 
       {/* Navigation */}
@@ -180,7 +181,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* User */}
-      <div className="p-3 border-t border-border">
+      <div className="p-3 relative">
+        <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+      </div>
+      <div className="p-3 pt-0">
         <div className="flex items-center gap-2.5 px-2 py-2">
           <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-xs">
             {user?.user_id?.[0]?.toUpperCase() || "U"}

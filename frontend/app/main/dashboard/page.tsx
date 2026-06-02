@@ -19,6 +19,22 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 
+function DashboardChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ color: string; name: string; value: number }>; label?: string }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-popover/95 backdrop-blur-md border border-border/60 rounded-xl p-3 shadow-2xl">
+      <p className="text-xs font-semibold text-foreground mb-1.5">{label}</p>
+      {payload.map((entry, i) => (
+        <div key={i} className="flex items-center gap-2 text-xs">
+          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
+          <span className="text-muted-foreground">{entry.name}:</span>
+          <span className="font-semibold text-foreground tabular-nums"><TokenDisplay n={entry.value} /></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function HeroStat({ icon: Icon, label, value, loading, color = "primary", sub }: {
   icon: React.ElementType; label: string; value: React.ReactNode; loading?: boolean;
   color?: string; sub?: React.ReactNode;
@@ -74,7 +90,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const [channelCount, setChannelCount] = useState<number | null>(null);
   const [apiKeyCount, setApiKeyCount] = useState<number | null>(null);
-  const [adminStats, setAdminStats] = useState<any>(null);
+  const [adminStats, setAdminStats] = useState<{ userCount: number; channelCount: number; health: { database: string; status: string } | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
@@ -125,22 +141,6 @@ export default function DashboardPage() {
     tokens: d.total_tokens,
     requests: d.total_requests,
   }));
-
-  const ChartTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div className="bg-popover/95 backdrop-blur-md border border-border/60 rounded-xl p-3 shadow-2xl">
-        <p className="text-xs font-semibold text-foreground mb-1.5">{label}</p>
-        {payload.map((entry: any, i: number) => (
-          <div key={i} className="flex items-center gap-2 text-xs">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-            <span className="text-muted-foreground">{entry.name}:</span>
-            <span className="font-semibold text-foreground tabular-nums"><TokenDisplay n={entry.value} /></span>
-          </div>
-        ))}
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-8">
@@ -278,7 +278,7 @@ export default function DashboardPage() {
                     tickFormatter={(v) => formatTokens(v)}
                     width={50}
                   />
-                  <Tooltip content={<ChartTooltip />} />
+                  <Tooltip content={<DashboardChartTooltip />} />
                   <Area
                     type="monotone"
                     dataKey="tokens"

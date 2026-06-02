@@ -268,6 +268,17 @@
 .dark .token-json-bool { color: oklch(0.68 0.18 300); }
 .dark .token-json-num { color: oklch(0.72 0.16 25); }
 
+/* ── Table row hover ── */
+[data-slot="table-row"] {
+  transition: background-color 0.15s ease;
+}
+[data-slot="table-row"]:hover {
+  background-color: oklch(0 0 0 / 3%);
+}
+.dark [data-slot="table-row"]:hover {
+  background-color: oklch(1 0 0 / 3%);
+}
+
 /* ── Dark mode table fix ── */
 .dark [data-slot="table-row"] {
   border-bottom-color: oklch(0.28 0.015 250);

@@ -1,3 +1,5 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import { fadeInUp } from "@/lib/animations";
 import { motion } from "motion/react";

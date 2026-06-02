@@ -16,7 +16,9 @@ import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { Server, Plus, Trash2, Edit, RefreshCw, X, Key, Cookie, ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
+import { Server, Plus, Trash2, Edit, RefreshCw, X, Key, Cookie, Eye, EyeOff } from "lucide-react";
+import { Pagination } from "@/components/pagination";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Channel {
@@ -188,13 +190,14 @@ export default function ChannelsPage() {
     setIsOpen(true);
   };
 
-  const totalPages = Math.ceil(total / pageSize);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("确定要删除此渠道吗？")) return;
+  const handleDelete = async () => {
+    if (deleteTarget === null) return;
     try {
-      await apiFetch(`/admin/channels/${id}`, { method: "DELETE" });
+      await apiFetch(`/admin/channels/${deleteTarget}`, { method: "DELETE" });
       toast.success("已删除");
+      setDeleteTarget(null);
       fetchChannels();
     } catch (e: any) {
       toast.error(e.message || "删除失败");
@@ -367,7 +370,7 @@ export default function ChannelsPage() {
                           <Button variant="ghost" size="sm" onClick={() => handleEdit(ch)} title="编辑">
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(ch.id)} className="text-destructive hover:text-destructive hover:bg-destructive/10" title="删除">
+                          <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(ch.id)} className="text-destructive hover:text-destructive hover:bg-destructive/10" title="删除">
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
@@ -381,32 +384,16 @@ export default function ChannelsPage() {
         </Card>
       </motion.div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            共 {total} 条记录，第 {page + 1} / {totalPages} 页
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(Math.max(0, page - 1))}
-              disabled={page === 0}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-              disabled={page >= totalPages - 1}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="删除渠道"
+        description="确定要删除此渠道吗？删除后该渠道的所有配置将丢失。"
+        confirmText="删除"
+        onConfirm={handleDelete}
+      />
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="max-w-lg">

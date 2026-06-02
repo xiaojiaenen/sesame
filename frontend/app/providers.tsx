@@ -11,9 +11,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <ErrorBoundary>
         <AuthProvider>
           {children}
-          <Toaster />
         </AuthProvider>
       </ErrorBoundary>
+      <Toaster />
     </ThemeProvider>
   );
 }

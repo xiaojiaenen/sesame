@@ -31,7 +31,6 @@ export function StatCard({ icon: Icon, label, value, loading, color = "primary",
   const content = (
     <Card className={cn(
       "hover:shadow-md transition-all duration-200 h-full group cursor-pointer border-border/40 relative overflow-hidden",
-      `hover:${c.border}`,
       className,
     )}>
       <div className={`absolute top-0 right-0 w-20 h-20 ${c.bg} rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -translate-y-1/2 translate-x-1/2`} />

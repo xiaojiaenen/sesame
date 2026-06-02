@@ -16,13 +16,11 @@ import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { FileText, Search, AlertCircle, Zap, ArrowDown, ArrowUp, Wifi, WifiOff } from "lucide-react";
+import { FileText, Search, AlertCircle, ArrowDown, ArrowUp, Wifi, WifiOff } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 
 interface RequestLog {
   id: number;
-  user_id: string;
-  key_id: number | null;
   channel_id: number | null;
   model: string | null;
   internal_model: string | null;
@@ -133,14 +131,13 @@ function StreamBadge({ isStream }: { isStream: boolean }) {
   );
 }
 
-export default function LogsPage() {
+export default function UserLogsPage() {
   const [logs, setLogs] = useState<RequestLog[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [pageSize] = useState(50);
 
-  const [userId, setUserId] = useState("");
   const [model, setModel] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -154,13 +151,12 @@ export default function LogsPage() {
         limit: String(pageSize),
         offset: String(page * pageSize),
       });
-      if (userId) params.append("user_id", userId);
       if (model) params.append("model", model);
       if (startDate) params.append("start_date", startDate);
       if (endDate) params.append("end_date", endDate);
       if (errorsOnly) params.append("errors_only", "true");
 
-      const data = await apiFetch(`/admin/logs?${params}`);
+      const data = await apiFetch(`/user/logs?${params}`);
       setLogs(data.logs);
       setTotal(data.total);
     } catch (e: any) {
@@ -185,7 +181,7 @@ export default function LogsPage() {
     <div className="space-y-6">
       <PageHeader
         title="请求日志"
-        description="查看 API 调用记录"
+        description="查看我的 API 调用记录"
       />
 
       {/* Filters */}
@@ -193,10 +189,6 @@ export default function LogsPage() {
         <Card className="ring-1 ring-border/40 shadow-xs">
           <CardContent className="p-4">
             <div className="flex flex-wrap gap-4 items-end">
-              <div className="space-y-2">
-                <Label>用户 ID</Label>
-                <Input value={userId} onChange={e => setUserId(e.target.value)} placeholder="筛选用户" className="w-40" />
-              </div>
               <div className="space-y-2">
                 <Label>模型</Label>
                 <Input value={model} onChange={e => setModel(e.target.value)} placeholder="筛选模型" className="w-40" />
@@ -243,7 +235,6 @@ export default function LogsPage() {
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
                   <TableHead className="font-semibold text-foreground h-11 text-xs uppercase tracking-wider">时间</TableHead>
-                  <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">用户</TableHead>
                   <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">请求模型</TableHead>
                   <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">实际模型</TableHead>
                   <TableHead className="font-semibold text-foreground text-xs uppercase tracking-wider">Token 消耗</TableHead>
@@ -259,7 +250,6 @@ export default function LogsPage() {
                   Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
                       <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                      <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-24 rounded-full" /></TableCell>
                       <TableCell><Skeleton className="h-5 w-24 rounded-full" /></TableCell>
                       <TableCell><Skeleton className="h-8 w-28" /></TableCell>
@@ -272,7 +262,7 @@ export default function LogsPage() {
                   ))
                 ) : logs.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10}>
+                    <TableCell colSpan={9}>
                       <EmptyState
                         icon={<FileText className="w-8 h-8 text-muted-foreground" />}
                         title="暂无请求日志"
@@ -301,11 +291,6 @@ export default function LogsPage() {
                           ) : (
                             <span className="text-muted-foreground text-xs">-</span>
                           )}
-                        </TableCell>
-                        <TableCell className="py-2.5">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/8 text-primary">
-                            {log.user_id}
-                          </span>
                         </TableCell>
                         <TableCell className="py-2.5">
                           <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-mono bg-muted/60 text-foreground/80 max-w-[160px] truncate" title={log.model || ''}>
@@ -367,9 +352,9 @@ export default function LogsPage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div><span className="text-muted-foreground">日志 ID：</span>{selectedLog.id}</div>
-                <div><span className="text-muted-foreground">用户：</span>{selectedLog.user_id}</div>
                 <div><span className="text-muted-foreground">模型：</span>{selectedLog.model}</div>
                 <div><span className="text-muted-foreground">状态码：</span><StatusBadge code={selectedLog.status_code} /></div>
+                <div><span className="text-muted-foreground">格式：</span><FormatBadge format={selectedLog.api_format} /></div>
               </div>
               {selectedLog.error_message && (
                 <div>

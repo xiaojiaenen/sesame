@@ -11,7 +11,9 @@ import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { Key, ChevronLeft, ChevronRight, Trash2, User, Zap } from "lucide-react";
+import { Key, Trash2, User, Zap } from "lucide-react";
+import { Pagination } from "@/components/pagination";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 export default function AdminApiKeysPage() {
   const [keys, setKeys] = useState<any[]>([]);
@@ -41,13 +43,14 @@ export default function AdminApiKeysPage() {
     fetchKeys();
   }, [page]);
 
-  const totalPages = Math.ceil(total / pageSize);
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null);
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("确定要强制删除该 API Key 吗？")) return;
+  const handleDelete = async () => {
+    if (deleteTarget === null) return;
     try {
-      await apiFetch(`/admin/api-keys/${id}`, { method: "DELETE" });
+      await apiFetch(`/admin/api-keys/${deleteTarget}`, { method: "DELETE" });
       toast.success("已强制删除");
+      setDeleteTarget(null);
       fetchKeys();
     } catch (e: any) {
       toast.error(e.message || "删除失败");
@@ -157,10 +160,11 @@ export default function AdminApiKeysPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDelete(k.id)}
+                          onClick={() => setDeleteTarget(k.id)}
                           className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4 mr-1" />
+                          强制删除
                         </Button>
                       </TableCell>
                     </motion.tr>
@@ -172,32 +176,16 @@ export default function AdminApiKeysPage() {
         </Card>
       </motion.div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            共 {total} 条记录，第 {page + 1} / {totalPages} 页
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(Math.max(0, page - 1))}
-              disabled={page === 0}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-              disabled={page >= totalPages - 1}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} />
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="强制删除 API Key"
+        description="确定要强制删除该 API Key 吗？删除后立即失效，使用该 Key 的所有客户端将无法访问。"
+        confirmText="强制删除"
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

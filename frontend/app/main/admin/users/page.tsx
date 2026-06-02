@@ -15,7 +15,9 @@ import { motion } from "motion/react";
 import { fadeInUp } from "@/lib/animations";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
-import { Users, ChevronLeft, ChevronRight, Shield, User, UserMinus, Plus, Eye, EyeOff } from "lucide-react";
+import { Users, Shield, User, UserMinus, Plus, Eye, EyeOff } from "lucide-react";
+import { Pagination } from "@/components/pagination";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -69,13 +71,14 @@ export default function AdminUsersPage() {
     }
   };
 
-  const totalPages = Math.ceil(total / pageSize);
+  const [disableTarget, setDisableTarget] = useState<string | null>(null);
 
-  const handleDisable = async (id: string) => {
-    if (!confirm(`确定要禁用用户 ${id} 吗？`)) return;
+  const handleDisable = async () => {
+    if (!disableTarget) return;
     try {
-      await apiFetch(`/admin/users/${id}`, { method: "DELETE" });
+      await apiFetch(`/admin/users/${disableTarget}`, { method: "DELETE" });
       toast.success("用户已禁用");
+      setDisableTarget(null);
       fetchUsers();
     } catch (e: any) {
       toast.error(e.message || "操作失败");
@@ -188,7 +191,7 @@ export default function AdminUsersPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDisable(u.user_id)}
+                          onClick={() => setDisableTarget(u.user_id)}
                           disabled={!u.is_active || u.role === "admin"}
                           className="text-destructive hover:text-destructive hover:bg-destructive/10 disabled:opacity-30"
                         >
@@ -205,32 +208,16 @@ export default function AdminUsersPage() {
         </Card>
       </motion.div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            共 {total} 条记录，第 {page + 1} / {totalPages} 页
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(Math.max(0, page - 1))}
-              disabled={page === 0}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-              disabled={page >= totalPages - 1}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <Pagination page={page} total={total} pageSize={pageSize} onPageChange={setPage} />
+
+      <ConfirmDialog
+        open={!!disableTarget}
+        onOpenChange={(open) => { if (!open) setDisableTarget(null); }}
+        title="禁用用户"
+        description={`确定要禁用用户「${disableTarget}」吗？禁用后该用户的所有 API Key 将同步失效。`}
+        confirmText="禁用"
+        onConfirm={handleDisable}
+      />
 
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent>
