@@ -1,4 +1,10 @@
+import logging
+from typing import Literal
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings
+
+logger = logging.getLogger("sesame.config")
 
 
 class Settings(BaseSettings):
@@ -10,7 +16,7 @@ class Settings(BaseSettings):
     mysql_database: str = "sesame"
 
     # Redis
-    redis_mode: str = "single"  # single | cluster
+    redis_mode: Literal["single", "cluster"] = "single"
     redis_host: str = "127.0.0.1"
     redis_port: int = 6379
     redis_password: str = ""
@@ -42,6 +48,16 @@ class Settings(BaseSettings):
     max_concurrent_per_key: int = 10
 
     version: str = "1.1.0"
+
+    @model_validator(mode="after")
+    def _validate_critical_settings(self):
+        if not self.encryption_key:
+            logger.critical(
+                "ENCRYPTION_KEY is not set! This is a critical security risk. "
+                "Set ENCRYPTION_KEY to a base64-encoded 32-byte key in your .env file."
+            )
+            raise ValueError("ENCRYPTION_KEY must be set for secure operation")
+        return self
 
     @property
     def db_url(self) -> str:

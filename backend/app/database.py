@@ -1,9 +1,13 @@
 import asyncio
+import logging
 from collections.abc import AsyncGenerator
 
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.config import settings
+
+logger = logging.getLogger("sesame.db")
 
 
 class SafeAsyncSession(AsyncSession):
@@ -19,7 +23,11 @@ class SafeAsyncSession(AsyncSession):
         try:
             await asyncio.shield(AsyncSession.close(self))
         except asyncio.CancelledError:
-            raise
+            # Shield itself raised CancelledError — try unshielded close
+            try:
+                await AsyncSession.close(self)
+            except BaseException:
+                pass
         except BaseException:
             try:
                 await AsyncSession.close(self)
@@ -32,7 +40,7 @@ engine = create_async_engine(
     echo=False,
     pool_size=20,
     max_overflow=40,
-    pool_recycle=120,
+    pool_recycle=1800,
     pool_timeout=10,
     connect_args={
         "connect_timeout": 10,
@@ -65,23 +73,45 @@ async def init_db():
         for table, col, dtype in cols:
             try:
                 await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col}"))
-            except Exception:
+            except ProgrammingError:
                 pass  # 列已存在
+            except Exception as e:
+                logger.warning(f"Migration failed for {table}.{col}: {e}")
 
         # v1.3 扩大 key_prefix 列长度
         try:
             await conn.execute(text("ALTER TABLE api_keys MODIFY COLUMN key_prefix VARCHAR(20) NOT NULL"))
-        except Exception:
+        except ProgrammingError:
             pass
+        except Exception as e:
+            logger.warning(f"Migration failed for api_keys.key_prefix: {e}")
 
         # v1.4 请求日志添加 api_format 列
         try:
             await conn.execute(text("ALTER TABLE request_logs ADD COLUMN api_format VARCHAR(16) DEFAULT NULL"))
-        except Exception:
+        except ProgrammingError:
             pass
+        except Exception as e:
+            logger.warning(f"Migration failed for request_logs.api_format: {e}")
 
         # v1.5 用户默认模型
         try:
             await conn.execute(text("ALTER TABLE users ADD COLUMN default_model VARCHAR(64) DEFAULT NULL"))
-        except Exception:
+        except ProgrammingError:
             pass
+        except Exception as e:
+            logger.warning(f"Migration failed for users.default_model: {e}")
+
+        # v1.6 请求日志添加请求体和响应体列
+        try:
+            await conn.execute(text("ALTER TABLE request_logs ADD COLUMN request_body TEXT DEFAULT NULL"))
+        except ProgrammingError:
+            pass
+        except Exception as e:
+            logger.warning(f"Migration failed for request_logs.request_body: {e}")
+        try:
+            await conn.execute(text("ALTER TABLE request_logs ADD COLUMN response_body TEXT DEFAULT NULL"))
+        except ProgrammingError:
+            pass
+        except Exception as e:
+            logger.warning(f"Migration failed for request_logs.response_body: {e}")

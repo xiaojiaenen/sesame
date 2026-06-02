@@ -44,7 +44,6 @@ from app.database import async_session, init_db
 from app.routers import admin, anthropic, chat, health, responses, user
 from app.services.apikey_service import load_keys_to_cache
 from app.services.auth_service import create_user, get_user
-from app.services.mapping_service import load_mappings_to_cache
 from app.services.channel_service import load_channels_to_cache
 
 logger = logging.getLogger("sesame")
@@ -65,6 +64,9 @@ async def _init_admin():
 
 async def _cookie_check_loop():
     """定时检测所有 Cookie 有效性（每 30 分钟检查一次）"""
+    # 提前续期的缓冲时间（在过期前 2 小时就开始续期）
+    REFRESH_BUFFER_HOURS = 2
+
     while True:
         await asyncio.sleep(1800)
         try:
@@ -85,43 +87,58 @@ async def _cookie_check_loop():
                 )
                 for ucc in rows.scalars().all():
                     try:
-                        # 先检查过期时间
                         now = now_beijing()
                         expired_by_time = ucc.expire_at and ucc.expire_at < now
+                        # 即将过期（缓冲时间内）
+                        expiring_soon = (
+                            ucc.expire_at
+                            and not expired_by_time
+                            and (ucc.expire_at - now).total_seconds() < REFRESH_BUFFER_HOURS * 3600
+                        )
 
-                        if not expired_by_time:
+                        if not expired_by_time and not expiring_soon:
                             # 未到过期时间，验证 cookie 是否还有效
                             cookie = decrypt(ucc.cookie_encrypted)
                             channel = channel_service.get_channel(ucc.channel_id)
                             if not channel:
                                 continue
-                            valid, _ = await validate_cookie(cookie)
+                            valid, _ = await validate_cookie(cookie, ucc.channel_id)
                             if valid:
                                 continue
                             # cookie 已失效
+                            logger.info(f"Cookie invalid user={ucc.user_id} ch={ucc.channel_id}")
 
-                        # cookie 已过期或失效
+                        if expiring_soon:
+                            logger.info(f"Cookie expiring soon user={ucc.user_id} ch={ucc.channel_id} expire_at={ucc.expire_at}")
+
+                        # cookie 已过期 / 即将过期 / 失效
                         if ucc.auto_refresh and ucc.login_url and ucc.username and ucc.password_encrypted:
                             # 自动续期：重新登录
                             pwd = decrypt(ucc.password_encrypted)
-                            success, _, new_cookie, real_expire = await login_with_credentials(
+                            success, msg, new_cookie, real_expire = await login_with_credentials(
                                 ucc.login_url, ucc.username, pwd
                             )
                             if success and new_cookie:
                                 ucc.cookie_encrypted = encrypt(new_cookie)
                                 ucc.expire_at = real_expire if real_expire else now + timedelta(days=7)
                                 ucc.updated_at = now
+                                ucc.status = "active"
                                 await db.commit()
-                                logger.info(f"Auto-refreshed cookie user={ucc.user_id} ch={ucc.channel_id}")
+                                logger.info(f"Auto-refreshed cookie user={ucc.user_id} ch={ucc.channel_id} new_expire={ucc.expire_at}")
                             else:
+                                # 只有真正过期或失效才标记 expired，即将过期的暂时保留
+                                if expired_by_time or not expiring_soon:
+                                    ucc.status = "expired"
+                                    await db.commit()
+                                    logger.warning(f"Auto-refresh failed, marked expired user={ucc.user_id} ch={ucc.channel_id}: {msg}")
+                                else:
+                                    logger.warning(f"Auto-refresh failed but cookie still valid, will retry user={ucc.user_id} ch={ucc.channel_id}: {msg}")
+                        else:
+                            # 手动 cookie：只有真正过期才标记
+                            if expired_by_time:
                                 ucc.status = "expired"
                                 await db.commit()
-                                logger.warning(f"Auto-refresh failed, marked expired user={ucc.user_id} ch={ucc.channel_id}")
-                        else:
-                            # 手动 cookie：标记过期
-                            ucc.status = "expired"
-                            await db.commit()
-                            logger.info(f"Cookie expired user={ucc.user_id} ch={ucc.channel_id}")
+                                logger.info(f"Cookie expired user={ucc.user_id} ch={ucc.channel_id}")
                     except Exception as e:
                         logger.warning(f"Cookie check failed user={ucc.user_id}: {e}")
         except Exception as e:
@@ -140,8 +157,6 @@ async def lifespan(app: FastAPI):
 
     logger.info("Loading cache...")
     async with async_session() as db:
-        await load_mappings_to_cache(db)
-        logger.info("Mappings loaded.")
         await load_keys_to_cache(db)
         logger.info("API keys loaded.")
         await load_channels_to_cache(db)
@@ -151,9 +166,22 @@ async def lifespan(app: FastAPI):
         logger.info("User preferences cached.")
 
     cookie_task = asyncio.create_task(_cookie_check_loop())
+
+    def _cookie_task_done(task: asyncio.Task):
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc:
+            logger.error(f"Cookie check loop crashed: {exc}")
+
+    cookie_task.add_done_callback(_cookie_task_done)
     logger.info("Application startup complete.")
     yield
     cookie_task.cancel()
+    try:
+        await asyncio.wait_for(cookie_task, timeout=5)
+    except (asyncio.CancelledError, asyncio.TimeoutError):
+        pass
     from app.services.proxy_service import close_client
     from app.cache import close_redis
     from app.database import engine
