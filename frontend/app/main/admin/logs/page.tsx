@@ -18,6 +18,15 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { FileText, Search, AlertCircle, Zap, ArrowDown, ArrowUp, Wifi, WifiOff } from "lucide-react";
 import { Pagination } from "@/components/pagination";
+import { CodeBlock } from "@/components/code-block";
+
+function formatJsonBody(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}
 
 interface RequestLog {
   id: number;
@@ -382,17 +391,13 @@ export default function LogsPage() {
               {selectedLog.request_body && (
                 <div>
                   <div className="text-xs font-semibold text-foreground mb-1.5">请求体</div>
-                  <pre className="text-xs bg-background rounded-md p-3 border border-border/50 whitespace-pre-wrap break-all max-h-80 overflow-y-auto">
-                    {selectedLog.request_body}
-                  </pre>
+                  <CodeBlock code={formatJsonBody(selectedLog.request_body)} language="json" />
                 </div>
               )}
               {selectedLog.response_body && (
                 <div>
                   <div className="text-xs font-semibold text-foreground mb-1.5">响应体</div>
-                  <pre className="text-xs bg-background rounded-md p-3 border border-border/50 whitespace-pre-wrap break-all max-h-80 overflow-y-auto">
-                    {selectedLog.response_body}
-                  </pre>
+                  <CodeBlock code={formatJsonBody(selectedLog.response_body)} language="json" />
                 </div>
               )}
             </div>

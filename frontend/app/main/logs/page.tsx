@@ -18,6 +18,15 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { FileText, Search, AlertCircle, ArrowDown, ArrowUp, Wifi, WifiOff } from "lucide-react";
 import { Pagination } from "@/components/pagination";
+import { CodeBlock } from "@/components/code-block";
+
+function formatJsonBody(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}
 
 interface RequestLog {
   id: number;
@@ -346,7 +355,7 @@ export default function UserLogsPage() {
       <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>请求错误详情</DialogTitle>
+            <DialogTitle>请求详情</DialogTitle>
           </DialogHeader>
           {selectedLog && (
             <div className="space-y-4">
@@ -367,17 +376,13 @@ export default function UserLogsPage() {
               {selectedLog.request_body && (
                 <div>
                   <div className="text-xs font-semibold text-foreground mb-1.5">请求体</div>
-                  <pre className="text-xs bg-background rounded-md p-3 border border-border/50 whitespace-pre-wrap break-all max-h-80 overflow-y-auto">
-                    {selectedLog.request_body}
-                  </pre>
+                  <CodeBlock code={formatJsonBody(selectedLog.request_body)} language="json" />
                 </div>
               )}
               {selectedLog.response_body && (
                 <div>
                   <div className="text-xs font-semibold text-foreground mb-1.5">响应体</div>
-                  <pre className="text-xs bg-background rounded-md p-3 border border-border/50 whitespace-pre-wrap break-all max-h-80 overflow-y-auto">
-                    {selectedLog.response_body}
-                  </pre>
+                  <CodeBlock code={formatJsonBody(selectedLog.response_body)} language="json" />
                 </div>
               )}
             </div>

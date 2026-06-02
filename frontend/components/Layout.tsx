@@ -3,22 +3,28 @@
 import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Key, Users,
   Activity, LogOut, FileText, BarChart3, Server, BookOpen,
-  Menu, X, Sun, Moon
+  Menu, X, Sun, Moon, PlayCircle
 } from "lucide-react";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
+import { apiFetch } from "@/lib/api";
 import type { LucideIcon } from "lucide-react";
 
 const NAV_ITEMS = [
   { name: "仪表盘", href: "/main/dashboard", icon: LayoutDashboard },
   { name: "渠道管理", href: "/main/channels", icon: Server },
   { name: "API Key 管理", href: "/main/api-keys", icon: Key },
+  { name: "Playground", href: "/main/playground", icon: PlayCircle },
   { name: "使用说明", href: "/main/guide", icon: BookOpen },
 ];
 
@@ -35,6 +41,7 @@ const PAGE_TITLES: Record<string, string> = {
   dashboard: "仪表盘",
   channels: "渠道管理",
   "api-keys": "API Key 管理",
+  playground: "Playground",
   guide: "使用说明",
   users: "用户管理",
   logs: "请求日志",
@@ -108,6 +115,39 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+
+  // Password change dialog state
+  const [pwDialogOpen, setPwDialogOpen] = useState(false);
+  const [oldPw, setOldPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (newPw !== confirmPw) {
+      toast.error("两次输入的密码不一致");
+      return;
+    }
+    if (newPw.length < 6) {
+      toast.error("新密码长度不能少于 6 位");
+      return;
+    }
+    setPwLoading(true);
+    try {
+      await apiFetch(`/user/password?old_password=${encodeURIComponent(oldPw)}&new_password=${encodeURIComponent(newPw)}`, {
+        method: "PUT",
+      });
+      toast.success("密码修改成功");
+      setPwDialogOpen(false);
+      setOldPw("");
+      setNewPw("");
+      setConfirmPw("");
+    } catch (e: any) {
+      toast.error(e.message || "密码修改失败");
+    } finally {
+      setPwLoading(false);
+    }
+  };
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
 
@@ -200,6 +240,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Button
             variant="ghost"
             size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
+            onClick={() => setPwDialogOpen(true)}
+            title="修改密码"
+          >
+            <Key className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/5"
             onClick={logout}
             title="退出登录"
@@ -266,6 +315,35 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </main>
+
+      {/* Password Change Dialog */}
+      <Dialog open={pwDialogOpen} onOpenChange={setPwDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>修改密码</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>原密码</Label>
+              <Input type="password" value={oldPw} onChange={e => setOldPw(e.target.value)} placeholder="输入原密码" />
+            </div>
+            <div className="space-y-2">
+              <Label>新密码</Label>
+              <Input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="至少 6 位" />
+            </div>
+            <div className="space-y-2">
+              <Label>确认新密码</Label>
+              <Input type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="再次输入新密码" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPwDialogOpen(false)}>取消</Button>
+            <Button onClick={handleChangePassword} disabled={pwLoading}>
+              {pwLoading ? "修改中..." : "确认修改"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

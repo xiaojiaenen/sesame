@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
+  PieChart, Pie, Cell, Legend,
 } from "recharts";
 
 function DashboardChartTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ color: string; name: string; value: number }>; label?: string }) {
@@ -94,20 +95,23 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<SummaryData | null>(null);
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([]);
+  const [modelStats, setModelStats] = useState<{ model: string; total_tokens: number; total_requests: number }[]>([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [channelsRes, apiKeysRes, summaryRes, dailyRes] = await Promise.allSettled([
+        const [channelsRes, apiKeysRes, summaryRes, dailyRes, modelRes] = await Promise.allSettled([
           apiFetch("/user/channels"),
           apiFetch("/user/api-keys"),
           apiFetch("/user/usage/summary"),
           apiFetch("/user/usage/daily?days=14"),
+          apiFetch("/user/usage/by-model?days=30"),
         ]);
         if (channelsRes.status === "fulfilled") setChannelCount(channelsRes.value.total ?? 0);
         if (apiKeysRes.status === "fulfilled") setApiKeyCount(Array.isArray(apiKeysRes.value) ? apiKeysRes.value.length : (apiKeysRes.value.total ?? 0));
         if (summaryRes.status === "fulfilled") setSummary(summaryRes.value);
         if (dailyRes.status === "fulfilled") setDailyStats(dailyRes.value);
+        if (modelRes.status === "fulfilled") setModelStats(modelRes.value);
 
         if (user?.role === "admin") {
           const [usersRes, channelsRes, healthRes] = await Promise.allSettled([
@@ -292,6 +296,84 @@ export default function DashboardPage() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* ═══ Model Usage Distribution ═══ */}
+      {modelStats.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-primary/10 flex items-center justify-center">
+              <BarChart3 className="w-3.5 h-3.5 text-primary" />
+            </div>
+            模型用量分布（近 30 天）
+          </h3>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Card className="border-border/40">
+              <CardContent className="p-6">
+                <ResponsiveContainer width="100%" height={240}>
+                  <PieChart>
+                    <Pie
+                      data={modelStats.slice(0, 8)}
+                      dataKey="total_tokens"
+                      nameKey="model"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={90}
+                      paddingAngle={2}
+                    >
+                      {modelStats.slice(0, 8).map((_, i) => (
+                        <Cell key={i} fill={`oklch(${0.55 + i * 0.04} ${0.15 - i * 0.01} ${155 + i * 30})`} />
+                      ))}
+                    </Pie>
+                    <Tooltip content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0].payload;
+                      return (
+                        <div className="bg-popover/95 backdrop-blur-md border border-border/60 rounded-xl p-3 shadow-2xl">
+                          <p className="text-xs font-semibold text-foreground mb-1">{d.model}</p>
+                          <p className="text-xs text-muted-foreground"><TokenDisplay n={d.total_tokens} /> tokens</p>
+                          <p className="text-xs text-muted-foreground">{d.total_requests} 次请求</p>
+                        </div>
+                      );
+                    }} />
+                    <Legend
+                      formatter={(value: string) => <span className="text-xs text-muted-foreground">{value}</span>}
+                      iconSize={8}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+            <Card className="border-border/40">
+              <CardContent className="p-6">
+                <div className="space-y-3">
+                  {modelStats.slice(0, 6).map((m, i) => {
+                    const totalAll = modelStats.reduce((s, x) => s + x.total_tokens, 0);
+                    const pct = totalAll > 0 ? (m.total_tokens / totalAll * 100) : 0;
+                    return (
+                      <div key={m.model} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono text-foreground truncate max-w-[180px]">{m.model}</span>
+                          <span className="text-muted-foreground tabular-nums">{pct.toFixed(1)}%</span>
+                        </div>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${pct}%`,
+                              backgroundColor: `oklch(${0.55 + i * 0.04} ${0.15 - i * 0.01} ${155 + i * 30})`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 
