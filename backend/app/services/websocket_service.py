@@ -1,6 +1,7 @@
 """WebSocket 服务 - 实时监控 API 请求"""
 
 import asyncio
+import contextvars
 import json
 from datetime import datetime
 
@@ -15,6 +16,7 @@ class ConnectionManager:
     def __init__(self):
         self.active_connections: Set[WebSocket] = set()
         self._lock = asyncio.Lock()
+        self._active_count = 0
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -44,9 +46,26 @@ class ConnectionManager:
             async with self._lock:
                 self.active_connections -= disconnected
 
+    def incr_active(self) -> int:
+        self._active_count += 1
+        return self._active_count
+
+    def decr_active(self) -> int:
+        self._active_count = max(0, self._active_count - 1)
+        return self._active_count
+
+    @property
+    def active_count(self) -> int:
+        return self._active_count
+
 
 # 全局连接管理器
 manager = ConnectionManager()
+
+# 每请求上下文：由路由/proxy设置，broadcast 自动读取
+_channel_name: contextvars.ContextVar[str] = contextvars.ContextVar("_channel_name", default="")
+_api_format: contextvars.ContextVar[str] = contextvars.ContextVar("_api_format", default="")
+_user_agent: contextvars.ContextVar[str] = contextvars.ContextVar("_user_agent", default="")
 
 
 async def broadcast_request_event(
@@ -54,23 +73,43 @@ async def broadcast_request_event(
     user_id: str,
     model: str,
     tokens: int = 0,
+    tokens_prompt: int = 0,
+    tokens_completion: int = 0,
     latency_ms: int = 0,
     status_code: int = 200,
     is_stream: bool = False,
     error_message: str = None,
 ):
     """广播请求事件"""
+    # 并发计数
+    if event_type == "request_start":
+        active_count = manager.incr_active()
+    else:
+        active_count = manager.decr_active()
+
+    # token 速率（tokens/s）
+    token_rate = 0
+    if tokens_completion > 0 and latency_ms > 0:
+        token_rate = round(tokens_completion / (latency_ms / 1000), 1)
+
     event = {
-        "type": event_type,  # "request_start", "request_end", "request_error"
+        "type": event_type,
         "timestamp": now_beijing().isoformat(),
         "data": {
             "user_id": user_id,
             "model": model,
             "tokens": tokens,
+            "tokens_prompt": tokens_prompt,
+            "tokens_completion": tokens_completion,
+            "token_rate": token_rate,
             "latency_ms": latency_ms,
             "status_code": status_code,
             "is_stream": is_stream,
             "error_message": error_message,
+            "channel_name": _channel_name.get(""),
+            "api_format": _api_format.get(""),
+            "user_agent": _user_agent.get(""),
+            "active_count": active_count,
         }
     }
     await manager.broadcast(event)

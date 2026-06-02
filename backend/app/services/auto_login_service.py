@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from playwright.async_api import async_playwright
@@ -12,6 +12,22 @@ logger = logging.getLogger("sesame.auto_login")
 MAX_RETRIES = 2
 GOTO_TIMEOUT = 60000
 IDLE_TIMEOUT = 30000
+
+# 认证相关 cookie 名称关键词（大小写不敏感匹配）
+_AUTH_COOKIE_KEYWORDS = {
+    "session", "token", "auth", "sid", "jwt", "sso", "login", "user",
+    "credential", "access", "refresh", "ticket", "bearer", "cookie",
+    "phpsessid", "jsessionid", "asp.net", "connect.sid",
+}
+
+# 应该排除的短命 cookie 关键词（通常是跟踪/分析 cookie）
+_TRACKING_COOKIE_KEYWORDS = {
+    "_ga", "_gid", "_fbp", "_fbc", "utm_", "gclid", "fbclid",
+    "_gcl", "msclkid", "tt_", "li_", "bcookie",
+}
+
+# 最小 cookie 有效期（小时），低于此值的过期时间会被忽略
+MIN_COOKIE_EXPIRE_HOURS = 24
 
 
 async def login_with_credentials(
@@ -101,15 +117,40 @@ async def _do_login(
 
         cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in cookies)
 
-        # 取最早的 cookie 过期时间作为真实有效期（转为北京时间，去掉时区信息）
+        # 智能计算 cookie 有效期：只看认证相关 cookie，排除短命 tracking cookie
         from app.utils import now_beijing, BEIJING_TZ
+        now = now_beijing()
         earliest = None
+
         for c in cookies:
+            name_lower = c["name"].lower()
             exp = c.get("expires", -1)
-            if exp and exp > 0:
-                dt = datetime.fromtimestamp(exp, tz=BEIJING_TZ).replace(tzinfo=None)
+
+            # 跳过 session cookie（expires=-1 或 0 表示会话结束即过期）
+            if exp <= 0:
+                continue
+
+            # 跳过已过期的 cookie
+            dt = datetime.fromtimestamp(exp, tz=BEIJING_TZ).replace(tzinfo=None)
+            if dt <= now:
+                continue
+
+            # 跳过明确的 tracking/分析 cookie
+            if any(kw in name_lower for kw in _TRACKING_COOKIE_KEYWORDS):
+                continue
+
+            # 只考虑认证相关 cookie，或有效期 > 1 小时的未知 cookie
+            is_auth = any(kw in name_lower for kw in _AUTH_COOKIE_KEYWORDS)
+            hours_left = (dt - now).total_seconds() / 3600
+
+            if is_auth or hours_left > 1:
                 if earliest is None or dt < earliest:
                     earliest = dt
+
+        # 兜底：如果没找到有意义的过期时间，使用最小有效期
+        if earliest is None or (earliest - now).total_seconds() < MIN_COOKIE_EXPIRE_HOURS * 3600:
+            earliest = now + timedelta(hours=MIN_COOKIE_EXPIRE_HOURS)
+            logger.info(f"Cookie 过期时间过短或未找到，使用最小有效期: {MIN_COOKIE_EXPIRE_HOURS}h")
 
         return True, "登录成功", cookie_str, earliest
 

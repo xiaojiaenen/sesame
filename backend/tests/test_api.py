@@ -16,12 +16,10 @@ from app.main import app
 async def client():
     # Manually init DB since ASGI lifespan may not trigger
     from app.database import init_db, async_session
-    from app.services.mapping_service import load_mappings_to_cache
     from app.services.apikey_service import load_keys_to_cache
 
     await init_db()
     async with async_session() as db:
-        await load_mappings_to_cache(db)
         await load_keys_to_cache(db)
 
     transport = ASGITransport(app=app)
