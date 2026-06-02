@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -5,28 +7,27 @@ from jose import JWTError, jwt
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import logging
-
 from app.config import settings
 from app.models.db_models import ApiKey, User
 from app.services.apikey_service import disable_user_keys
 
-logger = logging.getLogger("sesame")
+logger = logging.getLogger("sesame.auth")
 
 SECRET_KEY = settings.encryption_key
-if not SECRET_KEY:
-    logger.warning("ENCRYPTION_KEY not set, using fallback secret. THIS IS INSECURE for production!")
-    SECRET_KEY = "dev-secret-change-me"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 24
 
 
-def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+async def hash_password(password: str) -> str:
+    return await asyncio.to_thread(
+        lambda: bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    )
 
 
-def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode(), hashed.encode())
+async def verify_password(plain: str, hashed: str) -> bool:
+    return await asyncio.to_thread(
+        lambda: bcrypt.checkpw(plain.encode(), hashed.encode())
+    )
 
 
 def create_access_token(user_id: str, role: str = "user") -> str:
@@ -46,7 +47,10 @@ def decode_access_token(token: str) -> dict | None:
 
 
 async def create_user(db: AsyncSession, user_id: str, password: str, role: str = "user") -> User:
-    user = User(user_id=user_id, password_hash=hash_password(password), role=role)
+    existing = await get_user(db, user_id)
+    if existing:
+        raise ValueError(f"User '{user_id}' already exists")
+    user = User(user_id=user_id, password_hash=await hash_password(password), role=role)
     db.add(user)
     await db.commit()
     await db.refresh(user)
@@ -64,6 +68,7 @@ async def list_users(db: AsyncSession, limit: int | None = None, offset: int = 0
         q = q.limit(limit)
     result = await db.execute(q)
     return list(result.scalars().all())
+
 
 async def count_users(db: AsyncSession) -> int:
     from sqlalchemy import func
@@ -83,14 +88,6 @@ async def disable_user(db: AsyncSession, user_id: str) -> bool:
         .values(is_active=False)
     )
     await db.commit()
-    # Invalidate key cache (no separate commit needed)
-    _invalidate_user_key_cache(user_id)
+    # Invalidate key cache via the proper service
+    await disable_user_keys(db, user_id)
     return True
-
-
-def _invalidate_user_key_cache(user_id: str):
-    """Invalidate cached keys for a user without DB access."""
-    from app.services.apikey_service import KEY_CACHE
-    to_remove = [k for k, v in KEY_CACHE.items() if v.get("user_id") == user_id]
-    for k in to_remove:
-        KEY_CACHE.pop(k, None)
